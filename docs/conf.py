@@ -27,7 +27,7 @@ author = 'Parashar Dhapola, Göran Karlsson'
 version = '0.1.0'
 # The full version, including alpha/beta/rc tags
 release = ''
-
+autodoc_mock_imports = ['_tkinter']
 
 # -- General configuration ---------------------------------------------------
 
