@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
     CLASSIFIERS = [
         "Development Status :: 4 - Beta",
-        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: BSD License",
         "Natural Language :: English",
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: Microsoft :: Windows',
@@ -23,8 +23,6 @@ if __name__ == "__main__":
     KEYWORDS = ['scRNA-Seq', 'bioinformatics', 'single cell', 'analysis',
                 'graph', 'cell alignment', 'rna-seq', 'sequencing',
                 'shared nearest neighbors', 'knn', 'snn']
-    # REQUIREMENTS = [x.rstrip('\n') for x in
-    #                 open('requirements.txt').readlines()]
     VERSION = open('VERSION').readline().rstrip('\n')
     setup(
         name='nabo',
@@ -35,7 +33,7 @@ if __name__ == "__main__":
         maintainer='Parashar Dhapola',
         maintainer_email='parashar.dhapola@gmail.com',
         url='https://github.com/parashardhapola/nabo',
-        license='MIT',
+        license='BSD 3-Clause',
         classifiers=CLASSIFIERS,
         keywords=KEYWORDS,
         install_requires=[],
