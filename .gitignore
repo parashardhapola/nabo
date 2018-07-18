@@ -1,0 +1,8 @@
+__pycache__
+.idea
+docs/_build
+docs/analysis/mll_enl/analysis_data
+docs/analysis/mll_enl/raw_data
+docs/analysis/mll_enl/notebooks/.ipynb_checkpoints/
+docs/analysis/mll_enl/notebooks/extra_*
+
