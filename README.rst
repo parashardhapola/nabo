@@ -1,12 +1,16 @@
-=====
-Nabo
-=====
-
-,,,,
-
 .. image:: https://readthedocs.org/projects/nabo/badge/?version=latest
     :target: https://nabo.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
+
+.. image:: https://img.shields.io/pypi/l/nabo.svg
+    :alt: License
+
+.. image:: https://img.shields.io/pypi/v/nabo.svg
+    :alt: PyPI
+
+=====
+Nabo
+=====
 
 .. image:: https://raw.githubusercontent.com/parashardhapola/nabo/master/docs/_static/me_map.png
     :width: 200
