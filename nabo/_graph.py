@@ -204,8 +204,6 @@ class Graph(nx.Graph):
         for i in self.refG.nodes(data=True):
             if 'cluster' in i[1]:
                 ret_val[i[0]] = i[1]['cluster']
-            else:
-                ret_val[i[0]] = 'NA'
         return ret_val
 
     def make_clusters(self, n_clusters: int) -> None:
@@ -227,7 +225,9 @@ class Graph(nx.Graph):
         return None
 
     def import_clusters(self, cluster_dict: Dict[str, str] = None,
-                        from_csv: str = None, csv_sep: str = ',') -> None:
+                        from_csv: str = None, csv_sep: str = ',',
+                        fill_missing: bool = False, missing_val: str = 'NA',
+                        reset_clusters: bool = True) -> None:
         """
         Import cluster information for reference cells.
 
@@ -238,6 +238,13 @@ class Graph(nx.Graph):
                          sure that the first column contains cell names and
                          second contains the cluster labels.
         :param csv_sep: Separator for CSV file (default: ',')
+        :param fill_missing: Fill in values for reference cells not present in
+                             cluster_dict (Default: False)
+        :param missing_val: This value will be filled in when fill_missing
+                            is True (Default: NA)
+        :param reset_clusters: If set to True then, previous cluster
+                               information, if any, will be erased
+                                (Default: True)
         :return: None
         """
         skipped_nodes = 0
@@ -252,6 +259,14 @@ class Graph(nx.Graph):
             cluster_dict = df[df.columns[0]].to_dict()
             cluster_dict = {k.upper()+'_'+self.refName: v for
                             k, v in cluster_dict.items()}
+        for node in self.refNodes:
+            if fill_missing is True and node not in cluster_dict:
+                cluster_dict[node] = missing_val
+            if reset_clusters is True:
+                try:
+                    del self.nodes[node]['cluster']
+                except KeyError:
+                    pass
         for node in cluster_dict:
             try:
                 self.nodes[node]['cluster'] = str(cluster_dict[node])
@@ -260,6 +275,17 @@ class Graph(nx.Graph):
         if skipped_nodes > 0:
             print('WARNING: %d cells do not exist in the reference graph and '
                   'their cluster info was not imported.' % skipped_nodes)
+
+    def _validate_clusters(self):
+        nclusts = len(set(self.clusters.values()))
+        if nclusts == 0:
+            raise ValueError('ERROR: Calculate clusters first using '
+                             '"make_clusters" or import clusters using '
+                             '"import_clusters"')
+        elif nclusts == 1:
+            raise ValueError('ERROR: Cannot classfiy targets when only '
+                             'one cluster is present in the graph')
+        return True
 
     def calc_modularity(self) -> float:
         """
@@ -387,8 +413,19 @@ class Graph(nx.Graph):
 
         if by_cluster:
             cluster_values = {x: [] for x in set(self.clusters.values())}
+            na_cluster_score = []
             for node in score:
-                cluster_values[self.clusters[node]].append(score[node])
+                try:
+                    cluster_values[self.clusters[node]].append(score[node])
+                except KeyError:
+                    na_cluster_score.append(score[node])
+            if len(na_cluster_score) > 0:
+                if 'NA' not in cluster_values:
+                    cluster_values['NA'] = []
+                else:
+                    print("WARNING: 'NA' cluster already exists. Appending "
+                          "value to it")
+                cluster_values['NA'].extend(na_cluster_score)
             return cluster_values
 
         if sorted_names_only:
@@ -461,7 +498,9 @@ class Graph(nx.Graph):
         :param min_weight: Minimum edge weight. Edges with less weight
                            than min_weight will be ignored but will still
                            contribute to total weight.
-        :param cluster_dict: Cluster labels for each reference cell
+        :param cluster_dict: Cluster labels for each reference cell. If not
+                             provided then the stored cluster information is
+                             used.
         :param na_label: Label for cells that failed to get classified
                            into any cluster
         :param ret_counts: It True, then returns number of target cells
@@ -473,10 +512,7 @@ class Graph(nx.Graph):
                              of target cells classified to that cluster
         """
         if cluster_dict is None:
-            if set(self.clusters.values()) == 'NA':
-                raise ValueError('ERROR: Calculate clusters first using '
-                                 '"make_clusters" or import clusters using '
-                                 '"import_clusters"')
+            self._validate_clusters()
             cluster_dict = self.clusters
         clusts = set(cluster_dict.values())
         classified_clusters = []
@@ -488,7 +524,7 @@ class Graph(nx.Graph):
             clust_weights = {x: 0 for x in clusts}
             tot_weight = 0
             for j in self.edges(i, data=True):
-                if j[2]['weight'] > min_weight:
+                if j[2]['weight'] > min_weight and j[1] in cluster_dict:
                     clust_weights[cluster_dict[j[1]]] += j[2]['weight']
                 tot_weight += j[2]['weight']  # even low weight is added to
                 # total weight to allow poor mappings to be penalized.
@@ -651,19 +687,18 @@ class Graph(nx.Graph):
                             this path distance (default: 0).
         :return: None
         """
-        valid_nodes = list(self.refNodes)
         if from_clusters is not None:
-            if set(self.clusters.values()) == 'NA':
-                raise ValueError('ERROR: Calculate clusters first using '
-                                 '"make_clusters" or import clusters using '
-                                 '"import_clusters"')
-            else:
-                if type(from_clusters) != list:
-                    raise TypeError("ERROR: from_cluster parameter value "
-                                    "should be a list")
-                from_clusters = {str(x): None for x in from_clusters}
-                valid_nodes = [x for x in valid_nodes if
-                               self.clusters[x] in from_clusters]
+            self._validate_clusters()
+            if type(from_clusters) != list:
+                raise TypeError("ERROR: from_cluster parameter value "
+                                "should be a list")
+            from_clusters = {str(x): None for x in from_clusters}
+            valid_nodes = []
+            for i in list(self.refNodes):
+                if i in self.clusters and self.clusters[i] in from_clusters:
+                    valid_nodes.append(i)
+        else:
+            valid_nodes = list(self.refNodes)
         valid_scores = self.get_mapping_score(target, min_score=min_score,
                                               all_nodes=False)
         test_nodes = {x: None for x in valid_nodes if x in valid_scores}

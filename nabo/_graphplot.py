@@ -49,6 +49,7 @@ class GraphPlot:
     :param vlw: Vertex line width
     :param v_alpha: Transparency/alpha value for vertices. Should be between
                     0 and 1
+    :param draw_edges: If False then edges are not drawn (Default: True)
     :param ec: Edge colour
     :param elw: Edge line width
     :param e_alpha: Edge transparency/alpha value
@@ -78,7 +79,7 @@ class GraphPlot:
                  vs=2, vs_scale=15,
                  vs_min=None, vs_max=None, vs_percent_trim=0,
                  vlw=0, v_alpha=0.6,
-                 ec='k', elw=0.1, e_alpha=0.1,
+                 draw_edges: bool = True, ec='k', elw=0.1, e_alpha=0.1,
                  texts=None, texts_fs=20,
                  title=None, title_fs=30,
                  label_attr=None, label_attr_type='centroid',
@@ -103,6 +104,7 @@ class GraphPlot:
         self.vertexSizeTrimValue = vs_percent_trim
         self.vertexLineWidth = vlw
         self.vertexAlpha = v_alpha
+        self.drawEdges = draw_edges
         self.edgeColors = ec
         self.edgeLineWidth = elw
         self.edgeAlpha = e_alpha
@@ -130,12 +132,15 @@ class GraphPlot:
         for node in g.nodes():
             if 'pos' in g.nodes[node]:
                 keep_nodes.append(node)
+        if len(keep_nodes) == 0:
+            raise ValueError("ERROR: None of the nodes in the graph has "
+                             "'pos' attribute")
         self.graph = g.subgraph(keep_nodes)
 
-        self._plot_edges()
         self._set_vertex_color()
         self._set_vertex_size()
         self._plot_nodes()
+        self._plot_edges()
         self._place_attr_label()
         self._clean()
         self._show_save()
@@ -148,6 +153,8 @@ class GraphPlot:
         return n['pos'][0], n['pos'][1]
 
     def _plot_edges(self):
+        if self.drawEdges is False:
+            return None
         edges = np.array([(self._get_coords(x[0]), self._get_coords(x[1]))
                           for x in self.graph.edges()])
         self.ax.add_collection(LineCollection(edges, colors=self.edgeColors,
@@ -171,19 +178,29 @@ class GraphPlot:
         if self.vertexColorAttr is not None:
             self.vertexColor = {}
             for i in self.graph.nodes():
-                self.vertexColor[i] = self.graph.node[i][self.vertexColorAttr]
+                try:
+                    attr = self.graph.node[i][self.vertexColorAttr]
+                except KeyError:
+                    # Missing value will be giving default vertex colour in the
+                    # _plot_nodes() method
+                    pass
+                else:
+                    self.vertexColor[i] = attr
             if len(self.vertexColor) > 0:
                 uniq_vals = natsorted(set(self.vertexColor.values()))
                 if all(isinstance(x, str) for x in uniq_vals):
-                    # If attribute values matplotlib string colors then they
-                    # are ignored
                     int_map = {v: n for n, v in enumerate(uniq_vals)}
                     new_vals = {}
                     for k, v in self.vertexColor.items():
                         new_vals[k] = int_map[v]
                     self.vertexColor = new_vals
+            else:
+                print("WARNING: The given attribute was not found in any node")
+                self.vertexColor = self.vertexColorDefault
 
         if isinstance(self.vertexColor, dict):
+            # Copy the dict to make sure that the original dict is not
+            # overwritten
             self.vertexColor = dict(self.vertexColor)
             keys = list(self.vertexColor.keys())
             vals = [self.vertexColor[x] for x in keys]
@@ -207,6 +224,7 @@ class GraphPlot:
                             vals, 100 - self.vertexColorTrimValue)
                     else:
                         self.vertexColorMax = vals.max()
+                # By default no trimming will happen
                 for k, v in self.vertexColor.items():
                     if v > self.vertexColorMax:
                         self.vertexColor[k] = self.vertexColorMax
@@ -322,10 +340,10 @@ class GraphPlot:
             attrs = {}
             for i in self.graph.nodes():
                 if self.labelAttr in self.graph.node[i]:
-                    if self.graph.node[i][self.labelAttr] not in attrs:
-                        attrs[self.graph.node[i][self.labelAttr]] = []
-                    attrs[self.graph.node[i][self.labelAttr]].append(
-                        self._get_coords(i))
+                    attr = self.graph.node[i][self.labelAttr]
+                    if attr not in attrs:
+                        attrs[attr] = []
+                    attrs[attr].append(self._get_coords(i))
             for i in attrs:
                 x = np.array(attrs[i]).T
                 self.ax.text(x[0].mean(), x[1].mean(), i, ha='center',
