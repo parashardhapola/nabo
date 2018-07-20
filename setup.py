@@ -36,7 +36,7 @@ if __name__ == "__main__":
         license='BSD 3-Clause',
         classifiers=CLASSIFIERS,
         keywords=KEYWORDS,
-        install_requires=[],
+        install_requires=[x.strip() for x in open('requirements.txt')],
         version=VERSION,
         packages=find_packages(),
         include_package_data=True,
