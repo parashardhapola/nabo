@@ -353,7 +353,8 @@ class Graph(nx.Graph):
                           top_n_only: int = None,
                           all_nodes: bool = True, score_multiplier: int = 1000,
                           ignore_nodes: List[str] = None,
-                          remove_suffix: bool = False):
+                          include_nodes: List[str] = None,
+                          remove_suffix: bool = False, verbose: bool = False):
         """
         Calculate a weighted/unweighted degree of incident target nodes on
         reference nodes.
@@ -382,6 +383,12 @@ class Graph(nx.Graph):
         :param ignore_nodes: List of nodes from 'target' sample to be
                              ignored while calculating the score (default:
                              None).
+        :param include_nodes: List of target nodes from 'target' sample.
+                              Mapping score will be calculated ONLY for those
+                              reference cells that are connected to this
+                              subset of target cells in the graph. By
+                              default mapping score will be calculated
+                              against each target node.
         :param remove_suffix: Remove suffix from cell names (default: False)
         :return: Mapping score
         """
@@ -392,22 +399,49 @@ class Graph(nx.Graph):
                                  '"import_clusters"')
         if target not in self.targetNames:
             raise ValueError('ERROR: %s not present in graph' % target)
-        score = {}
+        if ignore_nodes is not None and include_nodes is not None:
+            raise ValueError("ERROR: PLease provide only one of "
+                             "either 'ignore_nodes' or 'include_nodes' at a "
+                             "time")
+        target_nodes = {x: None for x in self.targetNodes[target]}
         if ignore_nodes is None:
             ignore_nodes = []
-        if len(ignore_nodes) != 0:
-            ignore_nodes = {x: None for x in ignore_nodes}
+        else:
+            temp = []
+            for node in ignore_nodes:
+                if node in target_nodes:
+                    temp.append(node)
+            ignore_nodes = list(temp)
+        if include_nodes is None:
+            include_nodes = list(self.targetNodes[target])
+        else:
+            temp = []
+            for node in include_nodes:
+                if node in target_nodes:
+                    temp.append(node)
+            include_nodes = list(temp)
+
+        include_nodes = list(set(include_nodes).difference(ignore_nodes))
+        g = nx.Graph(self.subgraph(self.refNodes + include_nodes))
+        g.remove_edges_from(self.refG.edges)
+        if verbose:
+            isolates = set(list(nx.isolates(g)))
+            print("INFO: The bipartite graph has %d edges" % g.size())
+            print("INFO: Mapping calculated against %d %s nodes" % (
+                len(include_nodes), target))
+            print("INFO: %d reference nodes do not connect with any target"
+                  " node" % len(isolates.intersection(self.refNodes)))
+            print("INFO: %d target nodes do not connect with any reference"
+                  " node" % len(isolates.intersection(include_nodes)))
+        score = {}
         for i in self.refNodes:
             score[i] = 0
-            for j in self.edges(i, data=True):
-                if j[1] in ignore_nodes:
-                    continue
-                if self.nodes[j[1]]['name'] == target:
-                    if weighted:
-                        if j[2]['weight'] > min_weight:
-                            score[i] += j[2]['weight']
-                    else:
-                        score[i] += 1
+            for j in g.edges(i, data=True):
+                if weighted:
+                    if j[2]['weight'] > min_weight:
+                        score[i] += j[2]['weight']
+                else:
+                    score[i] += 1
         score = {k: score_multiplier * v / len(self.targetNodes[target])
                  for k, v in score.items()}
 
