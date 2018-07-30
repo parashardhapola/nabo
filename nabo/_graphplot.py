@@ -270,8 +270,17 @@ class GraphPlot:
         elif isinstance(self.vertexColor, str):
             self.vertexColor = {x: colors.to_rgb(self.vertexColor)
                                 for x in self.graph.nodes()}
+        elif isinstance(self.vertexColor, tuple):
+            if len(self.vertexColor) != 3:
+                print('ERROR: RGB tuple should of have 3 elements')
+                self.vertexColor = {
+                    x: colors.to_rgb(self.vertexColorDefault)
+                    for x in self.graph.nodes()}
+            else:
+                self.vertexColor = {x: self.vertexColor
+                                    for x in self.graph.nodes()}
         else:
-            print('ERROR: Vertex color should be either dict or str type')
+            print('ERROR: Vertex color should be either dict/str/tuple type')
             self.vertexColor = {x: colors.to_rgb(self.vertexColorDefault)
                                 for x in self.graph.nodes()}
 
