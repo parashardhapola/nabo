@@ -166,7 +166,8 @@ def csv_to_h5(csv_fn: str, h5_fn: str, sep: str = ',',
               genes_in_columns: bool = False, inv_log: int = None,
               value_dtype: type = float, null_thresh: float = None,
               batch_size: int = 500, rownames: List[str] = None,
-              colnames: List[str] = None):
+              colnames: List[str] = None, colname_converter: dict = None,
+              rowname_converter: dict = None,):
     """
     This is a wrapper function for CsvToH5 which allows conversion of
 
@@ -194,12 +195,18 @@ def csv_to_h5(csv_fn: str, h5_fn: str, sep: str = ',',
     :param colnames: If the CSV file does not have have rownames then
                      provide them as a list. Please make sure that length of
                      this list is same as the number of rows. (Default: [])
+    :param colname_converter: Convert existing row names in file using this
+                              dictionary
+    :param rowname_converter: Convert existing column names in file using this
+                              dictionary
     :return: None
     """
     temp = CsvToH5(csv_fn=csv_fn, h5_fn=h5_fn, sep=sep, inv_log=inv_log,
                    value_dtype=value_dtype, null_thresh=null_thresh,
                    batch_size=batch_size, genes_in_columns=genes_in_columns,
-                   rownames=rownames, colnames=colnames)
+                   rownames=rownames, colnames=colnames,
+                   colname_converter=colname_converter,
+                   rowname_converter=rowname_converter)
     del temp
     return None
 
@@ -232,23 +239,31 @@ class CsvToH5:
     :param colnames: If the CSV file does not have have rownames then
                      provide them as a list. Please make sure that length of
                      this list is same as the number of rows. (Default: [])
+    :param colname_converter: Convert existing row names in file using this
+                              dictionary
+    :param rowname_converter: Convert existing column names in file using this
+                              dictionary
     """
     def __init__(self, csv_fn: str, h5_fn: str, sep: str = ',',
                  inv_log: int = None, value_dtype: type = float,
                  null_thresh: float = None, batch_size: int = 500,
                  genes_in_columns: bool = False, rownames: List[str] = None,
-                 colnames: List[str] = None):
+                 colnames: List[str] = None, colname_converter: dict = None,
+                 rowname_converter: dict = None,):
         self.csvFn = csv_fn
         self.h5Fn = h5_fn
         self.h5 = self._make_fn()
         self.sep = sep
         self.batchSize = batch_size
         self.genesInCols = genes_in_columns
+        self.colnameConverter = colname_converter
+        self.rownameConverter = rowname_converter
         self.valueDtype = value_dtype
         self.invLog = inv_log
         self.nullThresh = null_thresh
 
         self._header_present = False
+
         if colnames is None:
             colnames = open(self.csvFn).readline().rstrip(
                 '\n').split(self.sep)
@@ -262,7 +277,16 @@ class CsvToH5:
             rownames = fix_dup_names(rownames)
         self.rowNames = rownames
 
-        self.colNames = fix_dup_names(colnames)
+        if self.colnameConverter is not None:
+            self.colNames = []
+            for i in colnames:
+                if i in self.colnameConverter:
+                    self.colNames.append(self.colnameConverter[i].upper())
+                else:
+                    self.colNames.append(i)
+            self.colNames = fix_dup_names(self.colNames)
+        else:
+            self.colNames = fix_dup_names(colnames)
 
         self.nCols = len(self.colNames)
         self.colFreq = np.zeros(self.nCols)
@@ -310,6 +334,9 @@ class CsvToH5:
             if read_row_name:
                 row_name = vec[0].strip('"').strip("'").upper()
                 vec = vec[1:]
+                if self.rownameConverter is not None:
+                    if row_name in self.rownameConverter:
+                        row_name = self.rownameConverter[row_name].upper()
                 if row_name not in temp_row_names:
                     temp_row_names[row_name] = 1
                 else:
