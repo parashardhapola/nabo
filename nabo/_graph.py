@@ -9,6 +9,7 @@ import os
 from collections import Counter
 import pandas as pd
 import hac
+import json
 
 __all__ = ['Graph']
 
@@ -151,7 +152,7 @@ class Graph(nx.Graph):
         return None
 
     def set_ref_layout(self, niter: int = 500, verbose: bool = True,
-                       init_pos: dict = None,
+                       init_pos: dict = None, disable_rescaling: bool = False,
                        outbound_attraction_distribution: bool = True,
                        edge_weight_influence: float = 1.0,
                        jitter_tolerance: float = 1.0,
@@ -169,6 +170,9 @@ class Graph(nx.Graph):
         :param niter: Number of iterations (default: 500)
         :param verbose: Print the progress (default: True)
         :param init_pos: Initial positions of nodes
+        :param disable_rescaling: If True then layout coordinates are not
+                                  rescaled to only have non negative
+                                  positions (Default: False)
         :param outbound_attraction_distribution:
         :param edge_weight_influence:
         :param jitter_tolerance:
@@ -189,13 +193,19 @@ class Graph(nx.Graph):
             verbose=verbose)
         pos = force_atlas.forceatlas2_networkx_layout(
             self.refG, pos=init_pos, iterations=niter)
-        pos_array = np.array(list(pos.values())).T
-        min_x, min_y = pos_array[0].min(), pos_array[1].min()
-        max_x, max_y = pos_array[0].max(), pos_array[1].max()
-        pos = {k: ((v[0] - min_x) / (max_x - min_x),
-                   (v[1] - min_y) / (max_y - min_y)) for k, v in pos.items()}
+        if disable_rescaling is False:
+            pos_array = np.array(list(pos.values())).T
+            min_x, min_y = pos_array[0].min(), pos_array[1].min()
+            # max_x, max_y = pos_array[0].max(), pos_array[1].max()
+            pos = {k: ((v[0] - min_x), (v[1] - min_y)) for k, v in pos.items()}
+            # pos = {k: ((v[0] - min_x) / (max_x - min_x),
+            #            (v[1] - min_y) / (max_y - min_y))
+            #        for k, v in pos.items()}
         for node in pos:
             self.nodes[node]['pos'] = pos[node]
+        for node in self:
+            if node not in pos:
+                self.nodes[node]['pos'] = None
         return None
 
     @property
@@ -208,8 +218,7 @@ class Graph(nx.Graph):
 
     def make_clusters(self, n_clusters: int) -> None:
         """
-        Performs graph agglomerative clustering using algorithm in Newman
-        2004
+        Performs graph agglomerative clustering using algorithm in Newman 2004
 
         :param n_clusters: Number of clusters
         :return: None
@@ -225,56 +234,74 @@ class Graph(nx.Graph):
         return None
 
     def import_clusters(self, cluster_dict: Dict[str, str] = None,
-                        from_csv: str = None, csv_sep: str = ',',
-                        fill_missing: bool = False, missing_val: str = 'NA',
-                        reset_clusters: bool = True) -> None:
+                        missing_val: str = 'NA') -> None:
         """
         Import cluster information for reference cells.
 
         :param cluster_dict: Dictionary with cell names as keys and cluster
                              number as values. Cluster numbers should start
                              from 1
-        :param from_csv: Filename containing cluster information. Make
-                         sure that the first column contains cell names and
-                         second contains the cluster labels.
-        :param csv_sep: Separator for CSV file (default: ',')
-        :param fill_missing: Fill in values for reference cells not present in
-                             cluster_dict (Default: False)
         :param missing_val: This value will be filled in when fill_missing
                             is True (Default: NA)
-        :param reset_clusters: If set to True then, previous cluster
-                               information, if any, will be erased
-                                (Default: True)
         :return: None
         """
-        skipped_nodes = 0
-        if cluster_dict is None and from_csv is None:
-            raise ValueError("ERROR: provide a value for either "
-                             "'cluster_dict' or 'from_csv'")
-        if cluster_dict is not None and from_csv is not None:
-            raise ValueError("ERROR: provide a value for only ONE of either"
-                             "'cluster_dict' or 'from_csv'")
-        if from_csv is not None:
-            df = pd.read_csv(from_csv, index_col=0, sep=csv_sep)
-            cluster_dict = df[df.columns[0]].to_dict()
-            cluster_dict = {k.upper()+'_'+self.refName: v for
-                            k, v in cluster_dict.items()}
+        skipped_nodes = len(cluster_dict)
         for node in self.refNodes:
-            if fill_missing is True and node not in cluster_dict:
-                cluster_dict[node] = missing_val
-            if reset_clusters is True:
-                try:
-                    del self.nodes[node]['cluster']
-                except KeyError:
-                    pass
-        for node in cluster_dict:
-            try:
+            if node not in cluster_dict:
                 self.nodes[node]['cluster'] = str(cluster_dict[node])
-            except KeyError:
-                skipped_nodes += 1
+                skipped_nodes -= 1
+            else:
+                self.nodes[node]['cluster'] = missing_val
         if skipped_nodes > 0:
             print('WARNING: %d cells do not exist in the reference graph and '
                   'their cluster info was not imported.' % skipped_nodes)
+
+    def import_clusters_from_json(self, fn):
+        """
+        Import clusters om JSON file
+
+        :param fn: Input file in JSON format.
+        :return: None
+        """
+        return self.import_clusters(json.load(open(fn)))
+
+    def import_cluster_from_csv(self, csv: str, csv_sep: str = ',',
+                                cluster_col: int = 0,
+                                append_ref_name: bool = True):
+        """
+        :param csv: Filename containing cluster information. Make
+                    sure that the first column contains cell names and
+                    second contains the cluster labels.
+        :param csv_sep: Separator for CSV file (default: ',')
+        :param cluster_col: Column number (0 based count) where cluster
+                            info is present (Default: 0)
+        :param append_ref_name: Append the reference name to the cell name (
+                                Default: True)
+        :return: None
+        """
+        df = pd.read_csv(csv, index_col=0, sep=csv_sep)
+        cluster_dict = df[df.columns[cluster_col]].to_dict()
+        if append_ref_name:
+            cluster_dict = {k + '_' + self.refName: v for
+                            k, v in cluster_dict.items()}
+        return self.import_clusters(cluster_dict)
+
+    def save_clusters_as_json(self, outfn):
+        """
+
+        :param outfn: Output JSON file
+        :return:
+        """
+        with open(outfn, 'w') as OUT:
+            json.dump(self.clusters, OUT, indent=2)
+
+    def save_cluters_as_csv(self, outfn):
+        """
+
+        :param outfn: Output CSV file
+        :return:
+        """
+        pd.Series(self.clusters).to_csv(outfn)
 
     def _validate_clusters(self):
         nclusts = len(set(self.clusters.values()))
@@ -283,7 +310,7 @@ class Graph(nx.Graph):
                              '"make_clusters" or import clusters using '
                              '"import_clusters"')
         elif nclusts == 1:
-            raise ValueError('ERROR: Cannot classfiy targets when only '
+            raise ValueError('ERROR: Cannot classify targets when only '
                              'one cluster is present in the graph')
         return True
 
@@ -316,22 +343,83 @@ class Graph(nx.Graph):
                           for x in self.refG[i] if x in p])
         return q * norm
 
-    def import_layout(self, graph) -> None:
+    def import_layout(self, pos_dict) -> None:
         """
-        Copies 'pos' attribute values (x/y coordinate tuple) from input
-        graph into the to reference cells.
+         Alternatively one can provide a
+        dictionary with keys as node name and values as coordinate (x,
+        y) tuple.
 
-        :param graph: Graph
+        :param pos_dict: Dictionary with keys as node names and values as
+                         2D coordinates of nodes on the graph.
         :return: None
         """
-        pos_dict = {}
-        for i in graph.refG.nodes(data=True):
-            pos_dict[i[0]] = i[1]['pos']
         for node in self.refNodes:
             if node in pos_dict:
                 self.nodes[node]['pos'] = pos_dict[node]
             else:
-                self.nodes[node]['pos'] = (0, 0)
+                self.nodes[node]['pos'] = None
+        return None
+
+    def import_layout_from_json(self, fn):
+        """
+
+        :param fn: Input json file
+        :return:
+        """
+        return self.import_layout(json.load(open(fn)))
+
+    def import_layout_from_csv(self, csv: str, csv_sep: str = ',',
+                               cluster_col: int = 0,
+                               append_ref_name: bool = True):
+        """
+        :param csv: Filename containing layout coordinates. Make
+                    sure that the first column contains cell names and
+                    second contains the cluster labels.
+        :param csv_sep: Separator for CSV file (default: ',')
+        :param cluster_col: Column number (0 based count) where cluster
+                            info is present (Default: 0)
+        :param append_ref_name: Append the reference name to the cell name (
+                                Default: True)
+        :return: None
+        """
+        df = pd.read_csv(csv, index_col=0, sep=csv_sep)
+        pos_dict = df[df.columns[cluster_col]].to_dict()
+        if append_ref_name:
+            pos_dict = {k + '_' + self.refName: v for
+                            k, v in pos_dict.items()}
+        return self.import_layout(pos_dict)
+
+    def get_graph_pos(self):
+        """
+        Copies 'pos' attribute values (x/y coordinate tuple) from  graph nodes
+        and returns a dictionary
+        :return:
+        """
+        pos_dict = {}
+        for i in self.nodes(data=True):
+            try:
+                pos_dict[i[0]] = tuple(i[1]['pos'])
+            except KeyError:
+                pos_dict[i[0]] = None
+        return pos_dict
+
+    def save_layout_as_json(self, out_fn):
+        """
+
+        :param out_fn: Output json file
+        :return:
+        """
+        with open(out_fn, 'w') as OUT:
+            json.dump(self.get_graph_pos(), OUT, indent=2)
+        return None
+
+    def save_layout_as_csv(self, out_fn):
+        """
+
+        :param out_fn: Output CSV file
+        :return:
+        """
+        pd.Series(self.get_graph_pos()).to_csv(out_fn)
         return None
 
     @staticmethod
@@ -390,6 +478,7 @@ class Graph(nx.Graph):
                               default mapping score will be calculated
                               against each target node.
         :param remove_suffix: Remove suffix from cell names (default: False)
+        :param verbose: Prints graph stats
         :return: Mapping score
         """
         if by_cluster:
@@ -663,8 +752,17 @@ class Graph(nx.Graph):
         lap = np.identity(adj.shape[0]) - adj / np.meshgrid(degree, degree)[1]
         ilap = np.linalg.pinv(lap)
         if r is None:
-            r = np.ones(ilap.shape[0])
-        return dict(zip(adj.columns, np.dot(ilap, r)))
+            rvec = np.ones(ilap.shape[0])
+        else:
+            rvec = []
+            for i in list(self.refG.nodes):
+                if i in r:
+                    rvec.append(r[i])
+                else:
+                    print('ERROR: %s node is missing in r')
+                    return {}
+            rvec = np.array(rvec)
+        return dict(zip(adj.columns, np.dot(ilap, rvec)))
 
     def get_k_path_neighbours(self, nodes: List[str], k_dist: int,
                               full_trail: bool = False,

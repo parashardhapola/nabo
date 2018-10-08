@@ -1,4 +1,4 @@
-import networkx as nx
+from ._graph import Graph
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
@@ -15,7 +15,8 @@ class GraphPlot:
     """
     Class for customized Graph drawing
 
-    :param g: A networkx graph
+    :param g: A Graph class instance from Nabo
+    :param only_ref: Only reference graph is drawn is True (default: True)
     :param vc: vertex colour. Can be a valid matplotlib color string,
                a dictionary with node names as keys and values as
                matplotlib color strings/ floats / RGB  tuple. If floats
@@ -49,7 +50,8 @@ class GraphPlot:
     :param vlw: Vertex line width
     :param v_alpha: Transparency/alpha value for vertices. Should be between
                     0 and 1
-    :param draw_edges: If False then edges are not drawn (Default: True)
+    :param draw_edges: Can be either: 'all', 'ref', 'target', 'none' (
+                       Default: 'all')
     :param ec: Edge colour
     :param elw: Edge line width
     :param e_alpha: Edge transparency/alpha value
@@ -69,26 +71,29 @@ class GraphPlot:
     :param save_name: File name for saving figure
     :param fig_size: Figure size. Should be a tuple (width, height)
     :param show_fig: If True then show figure
+    :param remove_axes: Remove axis and ticklabels if set to True
+                        (Default: True)
     :param ax: Matplotlib axis. Draws on this axis rather than create new.
     :param verbose: If True, then prints messages.
     """
-    def __init__(self, g: nx.Graph, vc='steelblue', cmap=None,
+    def __init__(self, g: Graph, only_ref=True, vc='steelblue', cmap=None,
                  vc_attr=None, vc_default='grey',
                  vc_min=None, vc_max=None, vc_percent_trim=None,
                  max_ncolors=40,
                  vs=2, vs_scale=15,
                  vs_min=None, vs_max=None, vs_percent_trim=0,
                  vlw=0, v_alpha=0.6,
-                 draw_edges: bool = True, ec='k', elw=0.1, e_alpha=0.1,
+                 draw_edges: str = 'all', ec='k', elw=0.1, e_alpha=0.1,
                  texts=None, texts_fs=20,
                  title=None, title_fs=30,
                  label_attr=None, label_attr_type='centroid',
                  label_attr_pos=(1, 1), label_attr_space=0.05,
                  label_attr_fs=16,
-                 save_name=None, fig_size=(5, 5), show_fig=True,
-                 ax=None, verbose=False):
+                 save_name=None, dpi=200, fig_size=(5, 5), show_fig=True,
+                 remove_axes=True, ax=None, verbose=False):
         if texts is None:
             texts = []
+        self.graph = g
         self.vertexColor = vc
         self.colormap = cmap
         self.vertexColorAttr = vc_attr
@@ -118,8 +123,10 @@ class GraphPlot:
         self.labelAttrSpace = label_attr_space
         self.labelAttrFontSize = label_attr_fs
         self.saveName = save_name
+        self.dpi = dpi
         self.figSize = fig_size
         self.showFig = show_fig
+        self.removeAxes = remove_axes
         self.ax = ax
         self.verbose = verbose
 
@@ -129,14 +136,17 @@ class GraphPlot:
             _, self.ax = plt.subplots(1, 1, figsize=self.figSize)
 
         keep_nodes = []
-        for node in g.nodes():
-            if 'pos' in g.nodes[node]:
+        for node in self.graph.nodes():
+            if 'pos' in self.graph.nodes[node] and  \
+                    self.graph.nodes[node]['pos'] is not None:
                 keep_nodes.append(node)
+        if only_ref:
+            keep_nodes = list(set(keep_nodes).intersection(
+                self.graph.refG.nodes))
         if len(keep_nodes) == 0:
             raise ValueError("ERROR: None of the nodes in the graph has "
                              "'pos' attribute")
-        self.graph = g.subgraph(keep_nodes)
-
+        self.positions = {x: self.graph.nodes[x]['pos'] for x in keep_nodes}
         self._set_vertex_color()
         self._set_vertex_size()
         self._plot_nodes()
@@ -148,18 +158,30 @@ class GraphPlot:
     def __repr__(self):
         return "GraphPlot of %d nodes" % len(self.graph)
 
-    def _get_coords(self, node):
-        n = self.graph.node[node]
-        return n['pos'][0], n['pos'][1]
-
     def _plot_edges(self):
-        if self.drawEdges is False:
+        if self.drawEdges == 'none':
             return None
-        edges = np.array([(self._get_coords(x[0]), self._get_coords(x[1]))
-                          for x in self.graph.edges()])
-        self.ax.add_collection(LineCollection(edges, colors=self.edgeColors,
-                                              linewidths=self.edgeLineWidth,
-                                              alpha=self.edgeAlpha, zorder=1))
+        if self.drawEdges == 'all':
+            edges = np.array([(self.positions[x[0]], self.positions[x[1]])
+                              for x in self.graph.edges if x[0] in
+                              self.positions and x[1] in self.positions])
+        elif self.drawEdges is 'ref':
+            edges = np.array([(self.positions[x[0]], self.positions[x[1]])
+                              for x in self.graph.refG.edges if x[0] in
+                              self.positions and x[1] in self.positions])
+        else:
+            edges = []
+            for i in self.graph.targetNodes[self.drawEdges]:
+                if i not in self.positions:
+                    continue
+                for j in dict(self.graph[i]).keys():
+                    edges.append((self.positions[i], self.positions[j]))
+            edges = np.array(edges)
+        if len(edges) > 0:
+            self.ax.add_collection(
+                LineCollection(edges, colors=self.edgeColors,
+                               linewidths=self.edgeLineWidth,
+                               alpha=self.edgeAlpha, zorder=1))
 
     def _set_vertex_color(self):
         if isinstance(self.vertexColorDefault, str):
@@ -179,7 +201,7 @@ class GraphPlot:
             self.vertexColor = {}
             for i in self.graph.nodes():
                 try:
-                    attr = self.graph.node[i][self.vertexColorAttr]
+                    attr = self.graph.nodes[i][self.vertexColorAttr]
                 except KeyError:
                     # Missing value will be giving default vertex colour in the
                     # _plot_nodes() method
@@ -311,8 +333,8 @@ class GraphPlot:
     def _plot_nodes(self):
         pos, colours, sizes = [], [], []
         min_size = min(self.vertexSize.values())
-        for i in self.graph.nodes():
-            pos.append(self._get_coords(i))
+        for i in self.positions:
+            pos.append(self.positions[i])
             if i in self.vertexColor:
                 colours.append(self.vertexColor[i])
             else:
@@ -329,10 +351,10 @@ class GraphPlot:
     def _place_attr_label(self):
         if self.labelAttr is not None and self.labelAttrType == 'legend':
             attrs = {}
-            for i in self.graph.nodes():
-                if self.labelAttr in self.graph.node[i]:
-                    if self.graph.node[i][self.labelAttr] not in attrs:
-                        attrs[self.graph.node[i][self.labelAttr]] =  \
+            for i in self.positions:
+                if self.labelAttr in self.graph.nodes[i]:
+                    if self.graph.nodes[i][self.labelAttr] not in attrs:
+                        attrs[self.graph.nodes[i][self.labelAttr]] =  \
                             self.vertexColor[i]
                 else:
                     if 'Unknown' not in attrs:
@@ -347,12 +369,12 @@ class GraphPlot:
                              i, fontsize=self.labelAttrFontSize, va='center')
         elif self.labelAttr is not None and self.labelAttrType == 'centroid':
             attrs = {}
-            for i in self.graph.nodes():
-                if self.labelAttr in self.graph.node[i]:
-                    attr = self.graph.node[i][self.labelAttr]
+            for i in self.positions:
+                if self.labelAttr in self.graph.nodes[i]:
+                    attr = self.graph.nodes[i][self.labelAttr]
                     if attr not in attrs:
                         attrs[attr] = []
-                    attrs[attr].append(self._get_coords(i))
+                    attrs[attr].append(self.positions[i])
             for i in attrs:
                 x = np.array(attrs[i]).T
                 self.ax.text(x[0].mean(), x[1].mean(), i, ha='center',
@@ -364,17 +386,18 @@ class GraphPlot:
                          fontsize=self.textFontSize, ha='center')
 
     def _clean(self):
-        self.ax.set_xticklabels([])
-        self.ax.set_yticklabels([])
-        for i in ['top', 'bottom', 'left', 'right']:
-            self.ax.spines[i].set_visible(False)
-        self.ax.grid(False)
+        if self.removeAxes:
+            self.ax.set_xticklabels([])
+            self.ax.set_yticklabels([])
+            for i in ['top', 'bottom', 'left', 'right']:
+                self.ax.spines[i].set_visible(False)
+            self.ax.grid(False)
         self.ax.figure.patch.set_alpha(0)
         self.ax.patch.set_alpha(0)
 
     def _show_save(self):
         plt.tight_layout()
         if self.saveName is not None:
-            plt.savefig(self.saveName, dpi=200, transparent=True)
+            plt.savefig(self.saveName, dpi=self.dpi, transparent=True)
         if self.showFig is True:
             plt.show()

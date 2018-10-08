@@ -276,6 +276,34 @@ class Dataset:
                 [x for x in self.genes if re.match(sp, x) is not None])
         return sorted(set(genes))
 
+    def export_as_dataframe(self, genes: List[str],
+                            normalized: bool = True) -> pd.DataFrame:
+        """
+
+        :param genes:
+        :param normalized:
+        :return:
+        """
+
+        h5: h5py.File = h5py.File(self.h5Fn, mode='r', libver='latest')
+        values = []
+        saved_genes = []
+        for gene in genes:
+            try:
+                d = h5['gene_data'][gene.upper()][:]
+            except KeyError:
+                continue
+            a = self._get_empty_cell_array()
+            a[d['idx']] = d['val']
+            if normalized:
+                a = a * self.sf
+            values.append(a[self.keepCellsIdx])
+            saved_genes.append(gene)
+        h5.close()
+        return pd.DataFrame(
+            values, index=saved_genes,
+            columns=[self.cells[x] for x in self.keepCellsIdx]).T
+
     def filter_data(self, min_exp: int = 1000, max_exp: int = np.inf,
                     min_ngenes: int = 100, max_ngenes: int = np.inf,
                     min_mito: int = -1, max_mito: int = 101,
