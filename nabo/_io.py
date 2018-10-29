@@ -167,7 +167,7 @@ def csv_to_h5(csv_fn: str, h5_fn: str, sep: str = ',',
               value_dtype: type = float, null_thresh: float = None,
               batch_size: int = 500, rownames: List[str] = None,
               colnames: List[str] = None, colname_converter: dict = None,
-              rowname_converter: dict = None,):
+              rowname_converter: dict = None, skip_lines: int = 0):
     """
     This is a wrapper function for CsvToH5 which allows conversion of
 
@@ -199,6 +199,8 @@ def csv_to_h5(csv_fn: str, h5_fn: str, sep: str = ',',
                               dictionary
     :param rowname_converter: Convert existing column names in file using this
                               dictionary
+    :param skip_lines: Number of lines to skip from top of the file
+                       (Default: 0)
     :return: None
     """
     temp = CsvToH5(csv_fn=csv_fn, h5_fn=h5_fn, sep=sep, inv_log=inv_log,
@@ -206,7 +208,8 @@ def csv_to_h5(csv_fn: str, h5_fn: str, sep: str = ',',
                    batch_size=batch_size, genes_in_columns=genes_in_columns,
                    rownames=rownames, colnames=colnames,
                    colname_converter=colname_converter,
-                   rowname_converter=rowname_converter)
+                   rowname_converter=rowname_converter,
+                   skip_lines=skip_lines)
     del temp
     return None
 
@@ -243,13 +246,14 @@ class CsvToH5:
                               dictionary
     :param rowname_converter: Convert existing column names in file using this
                               dictionary
+    :param skip_lines: Number of lines to skip from top of the file
     """
     def __init__(self, csv_fn: str, h5_fn: str, sep: str = ',',
                  inv_log: int = None, value_dtype: type = float,
                  null_thresh: float = None, batch_size: int = 500,
                  genes_in_columns: bool = False, rownames: List[str] = None,
                  colnames: List[str] = None, colname_converter: dict = None,
-                 rowname_converter: dict = None,):
+                 rowname_converter: dict = None, skip_lines: int = 0):
         self.csvFn = csv_fn
         self.h5Fn = h5_fn
         self.h5 = self._make_fn()
@@ -261,12 +265,14 @@ class CsvToH5:
         self.valueDtype = value_dtype
         self.invLog = inv_log
         self.nullThresh = null_thresh
-
+        self.skipLines = skip_lines
         self._header_present = False
 
         if colnames is None:
-            colnames = open(self.csvFn).readline().rstrip(
-                '\n').split(self.sep)
+            handle = open(self.csvFn)
+            for i in range(skip_lines):
+                next(handle)
+            colnames = next(handle).rstrip('\n').split(self.sep)
             colnames = [x.strip('"').strip("'").upper() for x in colnames]
             self._header_present = True
         if rownames is None:
@@ -320,6 +326,8 @@ class CsvToH5:
             grp = self.h5.create_group("gene_data")
             tqdm_msg = 'Saving gene-wise data          '
         handle = open(self.csvFn)
+        for i in range(self.skipLines):
+            next(handle)
         if self._header_present:
             next(handle)
         read_row_name = False
