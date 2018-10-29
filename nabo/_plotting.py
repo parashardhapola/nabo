@@ -21,7 +21,8 @@ def clean_axis(ax, ts=11, ga=0.4):
     return True
 
 
-def plot_summary_data(data, plot_names, color='skyblue'):
+def plot_summary_data(data, plot_names, color: str,
+                      display_stats: bool, savename: str):
     fig, axis = plt.subplots(1, len(plot_names), figsize=(13, 3))
     for i in range(len(plot_names)):
         val = np.array(data[i])
@@ -31,15 +32,19 @@ def plot_summary_data(data, plot_names, color='skyblue'):
         sns.stripplot(val, jitter=0.4, ax=ax, orient='v',
                       s=1.1, color='k', alpha=0.4)
         ax.set_ylabel(plot_names[i], fontsize=13)
-        if i < 2:
-            ax.set_title('Min: %d, Max: %d, Median: %d' % (
-                val.min(), val.max(), int(np.median(val))), fontsize=8)
-        else:
-            ax.set_title('Min: %.1f, Max: %.1f, Median: %.1f' % (
-                val.min(), val.max(), int(np.median(val))), fontsize=8)
+        if display_stats:
+            if i < 2:
+                ax.set_title('Min: %d, Max: %d, Median: %d' % (
+                    val.min(), val.max(), int(np.median(val))), fontsize=8)
+            else:
+                ax.set_title('Min: %.1f, Max: %.1f, Median: %.1f' % (
+                    val.min(), val.max(), int(np.median(val))), fontsize=8)
         clean_axis(ax)
     plt.tight_layout()
+    if savename is not None:
+        plt.savefig(savename, transparent=True, dpi=300)
     plt.show()
+    return None
 
 
 def plot_mean_var(data, hvg_bool, min_dt, min_et, max_dt, max_et,
