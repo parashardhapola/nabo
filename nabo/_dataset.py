@@ -355,10 +355,10 @@ class Dataset:
         remove_cells = set(remove_cells)
         self.keepCellsIdx = np.array(
             sorted(set(range(self.rawNCells)).difference(remove_cells)))
-        if min_gene_abundance < 1:
-            print("'min_gene_abundance' should be greater than 1")
-            print("Resetting 'min_gene_abundance' to 1", flush=True)
-            min_gene_abundance = 1
+        if min_gene_abundance < 0:
+            print("'min_gene_abundance' should be greater than or equal to 0")
+            print("Resetting 'min_gene_abundance' to 0", flush=True)
+            min_gene_abundance = 0
         gene_abundance = self.get_gene_abundance()
         remove_genes = list(np.where(gene_abundance < min_gene_abundance)[0])
         if rm_mito:
@@ -389,7 +389,8 @@ class Dataset:
         h5.flush(), h5.close()
         return None
 
-    def plot_raw(self) -> None:
+    def plot_raw(self, color: str = 'skyblue',
+                 display_stats: bool = True, savename: str = None) -> None:
         """
         Plot total expression, genes/cell, % mitochrondrial expression and
         % ribosomal expression fro each cell from raw data
@@ -405,15 +406,18 @@ class Dataset:
         plot_names = ['Total exp. per cell', 'Genes per cell',
                       '% mitochondrial genes', ' % ribosomal genes']
         plot_summary_data([tot_exp_per_cell, genes_per_cell,
-                           percent_mito, percent_ribo], plot_names)
+                           percent_mito, percent_ribo], plot_names, color,
+                          display_stats, savename)
         print("The dataset contains: %d cells and %d genes"
               % (self.rawNCells, self.rawNGenes), flush=True)
         return None
 
-    def plot_filtered(self) -> None:
+    def plot_filtered(self, color: str = 'skyblue',
+                      display_stats: bool = True,
+                      savename: str = None) -> None:
         """
-        Plot total expression, genes/cell, % mitochrondrial expression and
-        % ribosomal expression fro each cell from filtered data
+        Plot total expression, genes/cell, % mitochondrial expression and
+        % ribosomal expression for each cell from filtered data
 
         :return: None
         """
@@ -426,7 +430,8 @@ class Dataset:
         plot_names = ['Total exp. per cell', 'Genes per cell',
                       '% mitochondrial genes', ' % ribosomal genes']
         plot_summary_data([tot_exp_per_cell, genes_per_cell,
-                           percent_mito, percent_ribo], plot_names)
+                           percent_mito, percent_ribo], plot_names, color,
+                          display_stats, savename)
         print("The dataset contains: %d cells and %d genes"
               % (len(self.keepCellsIdx), len(self.keepGenesIdx)), flush=True)
         return None
