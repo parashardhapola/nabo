@@ -156,7 +156,7 @@ class GraphPlot:
         self._show_save()
 
     def __repr__(self):
-        return "GraphPlot of %d nodes" % len(self.graph)
+        return "GraphPlot of %d nodes" % len(self.positions)
 
     def _plot_edges(self):
         if self.drawEdges == 'none':
@@ -286,7 +286,9 @@ class GraphPlot:
                                     for k, v in self.vertexColor.items()}
             else:
                 print('ERROR: Vertex color dict values should be int/float '
-                      'values or RGB tuples')
+                      'values or RGB tuples. if you have mixed float and int '
+                      'values then make sure that all of them are of same '
+                      'type.')
                 self.vertexColor = {x: colors.to_rgb(self.vertexColorDefault)
                                     for x in self.graph.nodes()}
         elif isinstance(self.vertexColor, str):
@@ -344,7 +346,7 @@ class GraphPlot:
             else:
                 sizes.append(min_size * self.vertexSizeScale)
         pos = np.array(pos).T
-        self.ax.scatter(pos[0], pos[1], s=sizes, c=colours,
+        self.ax.scatter(pos[0], pos[1], s=sizes, c=np.array(colours),
                         lw=self.vertexLineWidth,
                         zorder=2, alpha=self.vertexAlpha)
 
@@ -359,11 +361,27 @@ class GraphPlot:
                 else:
                     if 'Unknown' not in attrs:
                         attrs['Unknown'] = self.vertexColor[i]
+            min_x, min_y = np.inf, np.inf
+            max_x, max_y = -np.inf, -np.inf
+            for i in self.positions.values():
+                if i[0] > max_x:
+                    max_x = i[0]
+                if i[0] < min_x:
+                    min_x = i[0]
+                if i[1] > max_y:
+                    max_y = i[1]
+                if i[1] < min_y:
+                    min_y = i[1]
+            self.labelAttrPos = [
+                min_x+(max_x-min_x)*self.labelAttrPos[0],
+                min_y+(max_y-min_y)*self.labelAttrPos[1]
+            ]
+            self.labelAttrSpace = (max_y-min_y)*self.labelAttrSpace
             for n, i in enumerate(attrs):
                 self.ax.scatter([self.labelAttrPos[0]],
                                 [self.labelAttrPos[1] -
                                     n * self.labelAttrSpace],
-                                s=100, c=attrs[i])
+                                s=100, c=[attrs[i]])
                 self.ax.text(self.labelAttrPos[0] + self.labelAttrSpace,
                              self.labelAttrPos[1] - n * self.labelAttrSpace,
                              i, fontsize=self.labelAttrFontSize, va='center')
