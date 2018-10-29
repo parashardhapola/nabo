@@ -10,6 +10,7 @@ from collections import Counter
 import pandas as pd
 import hac
 import json
+from tqdm import tqdm
 
 __all__ = ['Graph']
 
@@ -81,6 +82,7 @@ class Graph(nx.Graph):
                     node2 = j[0].decode('UTF-8')
                     weight = float(j[1].decode('UTF-8'))
                     self.add_edge(node, node2, weight=weight)
+
         h5.close()
         if kind == 'reference':
             self.refName = name
@@ -119,12 +121,11 @@ class Graph(nx.Graph):
             if attrs['kind'] == 'reference':
                 if self.refName is None:
                     self.refName = attrs['name']
-                else:
-                    if self.refName != attrs['name']:
-                        self.clear()
-                        raise ValueError('ERROR: Multiple reference samples '
-                                         'found. Please make sure you saved '
-                                         'the GML with Nabo.')
+                elif self.refName != attrs['name']:
+                    self.clear()
+                    raise ValueError('ERROR: Multiple reference samples '
+                                     'found. Please make sure you saved '
+                                     'the GML with Nabo.')
                 self.refNodes.append(i[0])
             elif attrs['kind'] == 'target':
                 if attrs['name'] not in self.targetNames:
@@ -135,6 +136,8 @@ class Graph(nx.Graph):
                 self.clear()
                 raise ValueError('ERROR: Kind can only be either "reference" '
                                  'or "target"')
+            if 'pos' in i[1] and i[1]['pos'] == 'None':
+                i[1]['pos'] = None
             self.add_node(i[0], **i[1])
         for i in g.edges(data=True):
             self.add_edge(i[0], i[1], weight=i[2]['weight'])
@@ -148,7 +151,7 @@ class Graph(nx.Graph):
         :param save_name: Output filename with path
         :return: None
         """
-        nx.write_gml(self, save_name)
+        nx.write_gml(self, save_name, stringizer=lambda x: str(x))
         return None
 
     def set_ref_layout(self, niter: int = 500, verbose: bool = True,
@@ -247,7 +250,7 @@ class Graph(nx.Graph):
         """
         skipped_nodes = len(cluster_dict)
         for node in self.refNodes:
-            if node not in cluster_dict:
+            if node in cluster_dict:
                 self.nodes[node]['cluster'] = str(cluster_dict[node])
                 skipped_nodes -= 1
             else:
@@ -265,9 +268,9 @@ class Graph(nx.Graph):
         """
         return self.import_clusters(json.load(open(fn)))
 
-    def import_cluster_from_csv(self, csv: str, csv_sep: str = ',',
-                                cluster_col: int = 0,
-                                append_ref_name: bool = True):
+    def import_clusters_from_csv(self, csv: str, csv_sep: str = ',',
+                                 cluster_col: int = 0,
+                                 append_ref_name: bool = True):
         """
         :param csv: Filename containing cluster information. Make
                     sure that the first column contains cell names and
@@ -295,7 +298,7 @@ class Graph(nx.Graph):
         with open(outfn, 'w') as OUT:
             json.dump(self.clusters, OUT, indent=2)
 
-    def save_cluters_as_csv(self, outfn):
+    def save_clusters_as_csv(self, outfn):
         """
 
         :param outfn: Output CSV file
@@ -353,11 +356,16 @@ class Graph(nx.Graph):
                          2D coordinates of nodes on the graph.
         :return: None
         """
-        for node in self.refNodes:
+        skipped_nodes = len(pos_dict)
+        for node in self.nodes:
             if node in pos_dict:
                 self.nodes[node]['pos'] = pos_dict[node]
+                skipped_nodes -= 1
             else:
                 self.nodes[node]['pos'] = None
+        if skipped_nodes > 0:
+            print('WARNING: %d cells do not exist in the reference graph and '
+                  'their position info was not imported.' % skipped_nodes)
         return None
 
     def import_layout_from_json(self, fn):
@@ -389,7 +397,8 @@ class Graph(nx.Graph):
                             k, v in pos_dict.items()}
         return self.import_layout(pos_dict)
 
-    def get_graph_pos(self):
+    @property
+    def layout(self):
         """
         Copies 'pos' attribute values (x/y coordinate tuple) from  graph nodes
         and returns a dictionary
@@ -399,7 +408,7 @@ class Graph(nx.Graph):
         for i in self.nodes(data=True):
             try:
                 pos_dict[i[0]] = tuple(i[1]['pos'])
-            except KeyError:
+            except (KeyError, TypeError):
                 pos_dict[i[0]] = None
         return pos_dict
 
@@ -410,7 +419,7 @@ class Graph(nx.Graph):
         :return:
         """
         with open(out_fn, 'w') as OUT:
-            json.dump(self.get_graph_pos(), OUT, indent=2)
+            json.dump(self.layout, OUT, indent=2)
         return None
 
     def save_layout_as_csv(self, out_fn):
@@ -419,7 +428,7 @@ class Graph(nx.Graph):
         :param out_fn: Output CSV file
         :return:
         """
-        pd.Series(self.get_graph_pos()).to_csv(out_fn)
+        pd.Series(self.layout).to_csv(out_fn)
         return None
 
     @staticmethod
@@ -667,6 +676,70 @@ class Graph(nx.Graph):
             return counts
         else:
             return dict(zip(self.targetNodes[target], classified_clusters))
+
+    def get_mapping_specificity(self, target_name: str,
+                                fill_na: bool = True) -> Dict[str, float]:
+        """
+        Calculates the mapping specificity of target nodes. Mapping
+        specificity of a target node is calculated as the mean of shortest
+        path lengths between all pairs of mapped reference nodes.
+
+        :param target_name: Name of target sample
+        :param fill_na: if True, then nan values will be replaced with
+                        largest value (default: True)
+        :return: Dictionary with target node names as keys and mapping
+                 specificity as values
+        """
+
+        path_lengths = {}
+        for node in tqdm(self.targetNodes[target_name]):
+            spls = []
+            targets = [x[1] for x in self.edges(node)]
+            nt = len(targets)
+            for i in range(nt):
+                for j in range(nt):
+                    if i < j:
+                        spls.append(nx.algorithms.shortest_path_length(
+                            self.refG, source=targets[i], target=targets[j]))
+            path_lengths[node] = float(np.mean(spls))
+        if fill_na:
+            max_val = max(path_lengths.values())
+            return pd.Series(path_lengths).fillna(max_val).to_dict()
+        else:
+            return path_lengths
+
+    def get_ref_specificity(self, target: str, target_values: Dict[str, float],
+                            incl_unmapped: bool = False) -> Dict[str, float]:
+        """
+        Calculates the average mapping specificity of all target nodes that
+        mapped to a given a reference node. Requires that the mapping
+        specificity of target nodes is already calculated.
+
+        :param target: Name of target sample
+        :param target_values: Mapping specificity values of target nodes
+        :param incl_unmapped: If True, then includes unmapped reference
+                              nodes in the dictionary with value set at 0
+                              Default: False)
+        :return: Dictionary with reference node names as keys and values as
+        mean mapping specificity of their mapped target nodes
+        """
+
+        back_prom = {}
+        for i in self.refNodes:
+            back_prom[i] = []
+            for j in self.edges(i, data=True):
+                if j[1][-len(target):] == target:
+                    back_prom[i].append(target_values[j[1]])
+        new_back_prom = {}
+        for i in back_prom:
+            if len(back_prom[i]) > 1:
+                new_back_prom[i] = np.mean(back_prom[i])
+            elif len(back_prom[i]) == 1:
+                new_back_prom[i] = back_prom[i][0]
+            else:
+                if incl_unmapped:
+                    new_back_prom[i] = 0
+        return new_back_prom
 
     def get_mapped_cells(self, target: str, ref_cells: str,
                          remove_suffix: bool = True) -> List[str]:
