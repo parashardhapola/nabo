@@ -353,8 +353,10 @@ class Dataset:
                         ribo_low_cells + ribo_high_cells +
                         ngenes_low_cells + ngenes_high_cells)
         remove_cells = set(remove_cells)
+        # self.keepCellsIdx = np.array(
+        #     sorted(set(range(self.rawNCells)).difference(remove_cells)))
         self.keepCellsIdx = np.array(
-            sorted(set(range(self.rawNCells)).difference(remove_cells)))
+             sorted(set(self.keepCellsIdx).difference(remove_cells)))
         if min_gene_abundance < 0:
             print("'min_gene_abundance' should be greater than or equal to 0")
             print("Resetting 'min_gene_abundance' to 0", flush=True)
@@ -366,8 +368,10 @@ class Dataset:
         if rm_ribo:
             remove_genes += [self.geneIdx[x] for x in self.riboGenes]
         remove_genes = set(remove_genes)
+        # self.keepGenesIdx = np.array(
+        #     sorted(set(range(self.rawNGenes)).difference(remove_genes)))
         self.keepGenesIdx = np.array(
-            sorted(set(range(self.rawNGenes)).difference(remove_genes)))
+             sorted(set(self.keepGenesIdx).difference(remove_genes)))
         if verbose:
             print("UMI filtered  : Low: %d High: %d" % (
                 len(umi_low_cells), len(umi_high_cells)), flush=True)
@@ -386,6 +390,34 @@ class Dataset:
         if 'keep_genes_idx' in grp:
             del grp['keep_genes_idx']
         grp.create_dataset('keep_genes_idx', data=self.keepGenesIdx)
+        h5.flush(), h5.close()
+        return None
+
+    def remove_cells(self, cell_names: List[str],
+                     verbose: bool = False) -> None:
+        """
+        Remove list of cells by providing their names
+
+        :param cell_names: List of cell names to remove
+        :param verbose: Print message about number of cells removed (
+                        Default: False)
+        :return:
+        """
+        rem_cells = []
+        for i in cell_names:
+            if i in self.cellIdx:
+                rem_cells.append(self.cellIdx[i])
+        num_keep_cells = len(self.keepCellsIdx)
+        self.keepCellsIdx = np.array(sorted(
+                set(list(self.keepCellsIdx)).difference(rem_cells)))
+        diff = num_keep_cells - len(self.keepCellsIdx)
+        if verbose:
+            print("%d cells removed" % diff)
+        h5: h5py.File = h5py.File(self.h5Fn, mode='a', libver='latest')
+        grp = h5['processed_data']
+        if 'keep_cells_idx' in grp:
+            del grp['keep_cells_idx']
+        grp.create_dataset('keep_cells_idx', data=self.keepCellsIdx)
         h5.flush(), h5.close()
         return None
 
@@ -796,28 +828,56 @@ class Dataset:
                              default: False)
         :return: None
         """
+
+        def make_eq_bins(n, bs):
+            a = n // bs
+            b = n // a
+            c = n % a
+            for i in range(a):
+                if i < c:
+                    yield b + 1
+                else:
+                    yield b
+
         n_comps = int(n_comps)
         if len(genes) < n_comps:
             n_comps = len(genes)
             print("WARNING: Number of components were reset to number of "
                   "features i.e. %d" % n_comps)
+        if n_comps > len(self.keepCellsIdx):
+            n_comps = len(self.keepCellsIdx) - 1
+            print("WARNING: Number of components were reset to number of "
+                  "cells - 1 i.e. %d" % n_comps)
         if batch_size is None or batch_size < n_comps:
             batch_size = n_comps * 2
+        if batch_size > len(self.keepCellsIdx):
+            batch_size = len(self.keepCellsIdx)
         scaling_params = self.get_scaling_params(genes)
         # Not using whitening parameter here. Testing it on a limited number
         # of datasets did not show any change in mapping, however it did
         # make the reference graph more noisy (read jittered).
         self.ipca = IncrementalPCA(n_components=n_comps)
         cache = []
-        for i, a in self.get_scaled_values(
+        cache_sizer = make_eq_bins(len(self.keepCellsIdx), batch_size)
+        cur_cache_size = next(cache_sizer)
+        n = 0
+        for _, a in self.get_scaled_values(
                 scaling_params, disable_tqdm=disable_tqdm,
                 tqdm_msg='Performing incremental PCA fit '):
             cache.append(list(a))
-            if len(cache) == batch_size:
+            n +=1
+            if len(cache) == cur_cache_size:
                 self.ipca.partial_fit(cache)
                 cache = []
+                try:
+                    cur_cache_size = next(cache_sizer)
+                except StopIteration:
+                    pass
         if len(cache) > 0:
-            self.ipca.partial_fit(cache)
+            print('WARNING: Not all cells were processed! This is a bug. '
+                  'Please report to the authors.')
+            print('Debug info: %d %d' % (len(self.keepCellsIdx),
+                                         len(cache)))
         self.ipca.genes = list(scaling_params.index)
         return None
 
