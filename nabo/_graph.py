@@ -544,11 +544,12 @@ class Graph(nx.Graph):
                  for k, v in score.items()}
 
         if by_cluster:
-            cluster_values = {x: [] for x in set(self.clusters.values())}
+            cluster_dict = self.clusters
+            cluster_values = {x: [] for x in set(cluster_dict.values())}
             na_cluster_score = []
             for node in score:
                 try:
-                    cluster_values[self.clusters[node]].append(score[node])
+                    cluster_values[cluster_dict[node]].append(score[node])
                 except KeyError:
                     na_cluster_score.append(score[node])
             if len(na_cluster_score) > 0:
@@ -650,6 +651,8 @@ class Graph(nx.Graph):
         classified_clusters = []
         degrees = dict(self.degree)
         for i in self.targetNodes[target]:
+            if i not in degrees:
+                continue
             if degrees[i] < min_degree:
                 classified_clusters.append(na_label)
                 continue
@@ -692,6 +695,7 @@ class Graph(nx.Graph):
         """
 
         path_lengths = {}
+        # TODO: FIX FOR MISSING TARGET NODES IF NODES ARE REMOVED MANUALLY
         for node in tqdm(self.targetNodes[target_name]):
             spls = []
             targets = [x[1] for x in self.edges(node)]
@@ -871,7 +875,8 @@ class Graph(nx.Graph):
 
     def set_de_groups(self, target: str, min_score: float,
                       node_dist: int, from_clusters: List[str] = None,
-                      full_trail: bool = False, trail_start: int = 1) -> None:
+                      full_trail: bool = False, trail_start: int = 1,
+                      stringent_control: bool = False) -> None:
         """
         Categorises reference nodes into either 'Test', 'Control' or 'Other'
         group. Nodes with mapping score higher than `min_score` are
@@ -890,6 +895,9 @@ class Graph(nx.Graph):
                            default: False)
         :param trail_start: If full_trail is True, then the trail starts at
                             this path distance (default: 0).
+        :param stringent_control: If True then control group will not
+                                  contain cells that have mapping score higher
+                                  than min_score
         :return: None
         """
         if from_clusters is not None:
@@ -899,8 +907,9 @@ class Graph(nx.Graph):
                                 "should be a list")
             from_clusters = {str(x): None for x in from_clusters}
             valid_nodes = []
+            cluster_dict = self.clusters
             for i in list(self.refNodes):
-                if i in self.clusters and self.clusters[i] in from_clusters:
+                if i in cluster_dict and cluster_dict[i] in from_clusters:
                     valid_nodes.append(i)
         else:
             valid_nodes = list(self.refNodes)
@@ -911,9 +920,14 @@ class Graph(nx.Graph):
             print('WARNING: Less than 5 test nodes found! Will not '
                   'set "de_group"')
             return None
-        control_nodes = {x: None for x in self.get_k_path_neighbours(
+        control_nodes = [x for x in self.get_k_path_neighbours(
             list(test_nodes.keys()), node_dist,
-            full_trail=full_trail, trail_start=trail_start)}
+            full_trail=full_trail, trail_start=trail_start)]
+        if stringent_control:
+            control_nodes = {x: None for x in control_nodes
+                             if x not in valid_scores}
+        else:
+            control_nodes = {x: None for x in control_nodes}
         for node in self.refNodes:
             if node in test_nodes:
                 self.nodes[node]['de_group'] = 'Test'
@@ -921,7 +935,6 @@ class Graph(nx.Graph):
                 self.nodes[node]['de_group'] = 'Control'
             else:
                 self.nodes[node]['de_group'] = 'Other'
-
         self.deTestCells = [x.rsplit('_', 1)[0] for x in test_nodes]
         self.deCtrlCells = [x.rsplit('_', 1)[0] for x in control_nodes]
         print("Test nodes: %d, Control nodes: %d" % (

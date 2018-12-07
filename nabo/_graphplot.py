@@ -5,8 +5,16 @@ import numpy as np
 from natsort import natsorted
 from matplotlib.collections import LineCollection
 from matplotlib import colors
-plt.style.use('fivethirtyeight')
+import pandas as pd
 
+try:
+    from datashader.bundling import hammer_bundle
+except ImportError:
+    hammer_bundle = None
+    print("WARNING: datashader not installed. Will be unble to perform edge "
+          "bundling")
+
+plt.style.use('fivethirtyeight')
 
 __all__ = ['GraphPlot']
 
@@ -76,6 +84,7 @@ class GraphPlot:
     :param ax: Matplotlib axis. Draws on this axis rather than create new.
     :param verbose: If True, then prints messages.
     """
+
     def __init__(self, g: Graph, only_ref=True, vc='steelblue', cmap=None,
                  vc_attr=None, vc_default='grey',
                  vc_min=None, vc_max=None, vc_percent_trim=None,
@@ -84,6 +93,9 @@ class GraphPlot:
                  vs_min=None, vs_max=None, vs_percent_trim=0,
                  vlw=0, v_alpha=0.6,
                  draw_edges: str = 'all', ec='k', elw=0.1, e_alpha=0.1,
+                 bundle_edges: bool = False, bundle_bw: float = 0.1,
+                 bundle_decay: float = 0.7,
+                 bundle_min_edge_weight: float = 0,
                  texts=None, texts_fs=20,
                  title=None, title_fs=30,
                  label_attr=None, label_attr_type='centroid',
@@ -113,6 +125,10 @@ class GraphPlot:
         self.edgeColors = ec
         self.edgeLineWidth = elw
         self.edgeAlpha = e_alpha
+        self.bundleEdges = bundle_edges
+        self.bundleBw = bundle_bw
+        self.bundleDecay = bundle_decay
+        self.bundleMinEdgeWeight = bundle_min_edge_weight
         self.texts = texts
         self.textFontSize = texts_fs
         self.title = title
@@ -137,7 +153,7 @@ class GraphPlot:
 
         keep_nodes = []
         for node in self.graph.nodes():
-            if 'pos' in self.graph.nodes[node] and  \
+            if 'pos' in self.graph.nodes[node] and \
                     self.graph.nodes[node]['pos'] is not None:
                 keep_nodes.append(node)
         if only_ref:
@@ -159,34 +175,76 @@ class GraphPlot:
         return "GraphPlot of %d nodes" % len(self.positions)
 
     def _plot_edges(self):
+        def make_bundles(nodes, edges):
+            node_name_map = {
+                x: n + 1 for n, x in enumerate(list(nodes))
+                if x in self.positions
+            }
+            n = pd.DataFrame(
+                [[node_name_map[k]] + list(map(float, v)) for k, v in
+                 self.positions.items() if k in node_name_map],
+                columns=['id', 'x', 'y'])
+            e = pd.DataFrame(
+                [[node_name_map[y] for y in x[:2]] for x in
+                 edges if x[2]['weight'] > self.bundleMinEdgeWeight
+                 and x[0] in node_name_map and x[1] in node_name_map
+                 ],
+                columns=['source', 'target'])
+            bundles = hammer_bundle(
+                n, e, decay=self.bundleDecay,
+                initial_bandwidth=self.bundleBw)
+            return bundles[~bundles.isna().any(axis=1)].values
+
         if self.drawEdges == 'none':
             return None
-        if self.drawEdges == 'all':
-            edges = np.array([(self.positions[x[0]], self.positions[x[1]])
-                              for x in self.graph.edges if x[0] in
-                              self.positions and x[1] in self.positions])
+        elif self.drawEdges == 'all':
+            if self.bundleEdges and hammer_bundle is not None:
+                edges = make_bundles(self.graph.nodes,
+                                     self.graph.edges(data=True))
+            else:
+                edges = np.array([(self.positions[x[0]], self.positions[x[1]])
+                                  for x in self.graph.edges if x[0] in
+                                  self.positions and x[1] in self.positions])
         elif self.drawEdges is 'ref':
-            edges = np.array([(self.positions[x[0]], self.positions[x[1]])
-                              for x in self.graph.refG.edges if x[0] in
-                              self.positions and x[1] in self.positions])
+            if self.bundleEdges and hammer_bundle is not None:
+                edges = make_bundles(self.graph.refNodes,
+                                     self.graph.refG.edges(data=True))
+            else:
+                edges = np.array([(self.positions[x[0]], self.positions[x[1]])
+                                  for x in self.graph.refG.edges if x[0] in
+                                  self.positions and x[1] in self.positions])
+        elif self.drawEdges in self.graph.targetNames:
+            if self.bundleEdges and hammer_bundle is not None:
+                edges = make_bundles(
+                    self.graph.refNodes,
+                    sum([list(self.graph.edges(i, data=True)) for i in
+                         self.graph.targetNodes[self.drawEdges]], [])
+                )
+            else:
+                edges = []
+                for i in self.graph.targetNodes[self.drawEdges]:
+                    if i not in self.positions:
+                        continue
+                    for j in dict(self.graph[i]).keys():
+                        edges.append((self.positions[i], self.positions[j]))
+                edges = np.array(edges)
         else:
-            edges = []
-            for i in self.graph.targetNodes[self.drawEdges]:
-                if i not in self.positions:
-                    continue
-                for j in dict(self.graph[i]).keys():
-                    edges.append((self.positions[i], self.positions[j]))
-            edges = np.array(edges)
+            return None
         if len(edges) > 0:
-            self.ax.add_collection(
-                LineCollection(edges, colors=self.edgeColors,
-                               linewidths=self.edgeLineWidth,
-                               alpha=self.edgeAlpha, zorder=1))
+            if len(edges.shape) == 3:
+                self.ax.add_collection(
+                    LineCollection(edges, colors=self.edgeColors,
+                                   linewidths=self.edgeLineWidth,
+                                   alpha=self.edgeAlpha, zorder=1))
+            elif len(edges.shape) == 2:
+                self.ax.plot(edges[:, 0], edges[:, 1], c=self.edgeColors,
+                             lw=self.edgeLineWidth,
+                             alpha=self.edgeAlpha, zorder=1)
 
     def _set_vertex_color(self):
         if isinstance(self.vertexColorDefault, str):
             self.vertexColorDefault = colors.to_rgb(
-                        self.vertexColorDefault)
+                self.vertexColorDefault)
         elif isinstance(self.vertexColorDefault, tuple):
             if len(self.vertexColorDefault) not in [3, 4]:
                 print('ERROR: vertex default color \
@@ -203,7 +261,7 @@ class GraphPlot:
                 try:
                     attr = self.graph.nodes[i][self.vertexColorAttr]
                 except KeyError:
-                    # Missing value will be giving default vertex colour in the
+                    # Missing value will be given default vertex colour in the
                     # _plot_nodes() method
                     pass
                 else:
@@ -232,12 +290,13 @@ class GraphPlot:
             vals = np.array(vals)
 
             if all(np.issubdtype(type(x), np.integer) for x in uniq_vals) or \
-               all(np.issubdtype(type(x), np.floating) for x in uniq_vals):
+                    all(np.issubdtype(type(x), np.floating) for x in
+                        uniq_vals):
 
                 if self.vertexColorMin is None:
                     if self.vertexColorTrimValue is not None:
                         self.vertexColorMin = np.percentile(
-                                vals, self.vertexColorTrimValue)
+                            vals, self.vertexColorTrimValue)
                     else:
                         self.vertexColorMin = vals.min()
                 if self.vertexColorMax is None:
@@ -268,7 +327,8 @@ class GraphPlot:
                 palette = sns.color_palette(self.colormap, n_vals)
 
                 new_vals = np.digitize(
-                    vals, np.linspace(vals.min(), vals.max()+1, n_vals+1)) - 1
+                    vals,
+                    np.linspace(vals.min(), vals.max() + 1, n_vals + 1)) - 1
                 # -1 is used to make the binned values start from 0
                 for k, v in zip(keys, new_vals):
                     self.vertexColor[k] = palette[v]
@@ -325,8 +385,8 @@ class GraphPlot:
                 self.vertexSize = {x: 25 for x in self.graph.nodes()}
         elif isinstance(self.vertexSize, float) or \
                 isinstance(self.vertexSize, int):
-                self.vertexSize = {x: self.vertexSize
-                                   for x in self.graph.nodes()}
+            self.vertexSize = {x: self.vertexSize
+                               for x in self.graph.nodes()}
         else:
             print('ERROR: Vertex sizes should be float or int values.')
             print('WARNING: Resetting vertex sizes to 25')
@@ -356,7 +416,7 @@ class GraphPlot:
             for i in self.positions:
                 if self.labelAttr in self.graph.nodes[i]:
                     if self.graph.nodes[i][self.labelAttr] not in attrs:
-                        attrs[self.graph.nodes[i][self.labelAttr]] =  \
+                        attrs[self.graph.nodes[i][self.labelAttr]] = \
                             self.vertexColor[i]
                 else:
                     if 'Unknown' not in attrs:
@@ -373,14 +433,14 @@ class GraphPlot:
                 if i[1] < min_y:
                     min_y = i[1]
             self.labelAttrPos = [
-                min_x+(max_x-min_x)*self.labelAttrPos[0],
-                min_y+(max_y-min_y)*self.labelAttrPos[1]
+                min_x + (max_x - min_x) * self.labelAttrPos[0],
+                min_y + (max_y - min_y) * self.labelAttrPos[1]
             ]
-            self.labelAttrSpace = (max_y-min_y)*self.labelAttrSpace
+            self.labelAttrSpace = (max_y - min_y) * self.labelAttrSpace
             for n, i in enumerate(attrs):
                 self.ax.scatter([self.labelAttrPos[0]],
                                 [self.labelAttrPos[1] -
-                                    n * self.labelAttrSpace],
+                                 n * self.labelAttrSpace],
                                 s=100, c=[attrs[i]])
                 self.ax.text(self.labelAttrPos[0] + self.labelAttrSpace,
                              self.labelAttrPos[1] - n * self.labelAttrSpace,
