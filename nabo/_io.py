@@ -29,6 +29,32 @@ def fix_dup_names(names):
     return renamed_names
 
 
+def cellranger_h5_to_mtx(h5, out_dir, genome='GRCh38'):
+    a = h5py.File(h5)[genome]
+
+    with open('%s/barcodes.tsv' % out_dir.rstrip('/'), 'w') as OUT:
+        OUT.write('\n'.join([x.decode('UTF-8') for x in a['barcodes'][:]]))
+    with open('%s/genes.tsv' % out_dir.rstrip('/'), 'w') as OUT:
+        gi = [x.decode('UTF-8') for x in a['genes'][:]]
+        gn = [x.decode('UTF-8') for x in a['gene_names'][:]]
+        OUT.write('\n'.join([x + '\t' + y for x, y in zip(gi, gn)]))
+
+    OUT = open('%s/matrix.mtx' % out_dir.rstrip('/'), 'w')
+    OUT.write('%%MatrixMarket matrix coordinate integer general\n%\n')
+    OUT.write(' '.join(map(str, [a['genes'].shape[0],
+                                 a['barcodes'].shape[0],
+                                 a['data'].shape[0]])) + '\n')
+    idx = 0
+    for n, i in tqdm(enumerate(a['indptr'][1:], 1),
+                     total=a['barcodes'].shape[0]):
+        cell_chunk = []
+        for g, v in zip(a['indices'][idx: i], a['data'][idx: i]):
+            cell_chunk.append(' '.join(map(str, [g + 1, n, v])))
+        idx = i
+        OUT.write('\n'.join(cell_chunk) + '\n')
+    OUT.close()
+
+
 def mtx_to_h5(in_dir: str, h5_fn: str, batch_size: int =10000,
               value_dtype=np.int64) -> None:
     """
@@ -47,6 +73,9 @@ def mtx_to_h5(in_dir: str, h5_fn: str, batch_size: int =10000,
     """
     temp = MtxToH5(in_dir=in_dir, h5_fn=h5_fn,
                    batch_size=batch_size, value_dtype=value_dtype)
+    temp._make_cell_index()
+    temp._make_gene_index()
+    temp.h5.close(), temp.h.close()
     del temp
     return None
 
@@ -62,7 +91,7 @@ class MtxToH5:
         Converts 10x output files into Nabo's HDF5 format
 
         :param in_dir: Name of directory containing barcodes.tsv, genes.tsv and
-                   matrix.mtx files
+                       matrix.mtx files
         :param h5_fn: Name of output HDF5 file.
         :param batch_size: Number of cells to process in one chunk. Larger
                            values will lead to increased memory consumption and
@@ -95,10 +124,6 @@ class MtxToH5:
                 'Number of gene in genes.tsv not same as in the mtx file')
         self.h5['names'].create_dataset(
             'genes', chunks=None, data=[x.encode("ascii") for x in self.genes])
-
-        self._make_cell_index()
-        self._make_gene_index()
-        self.h5.close(), self.h.close()
 
     def _make_fn(self):
         if os.path.isfile(self.h5FileName):
@@ -149,6 +174,7 @@ class MtxToH5:
                 d = self.h5['cell_data'][self.cells[i]][:]
                 for j in d:
                     gene = self.genes[j[0]]
+                    print(j, i)
                     if gene not in gene_cache:
                         gene_cache[gene] = []
                     gene_cache[gene].append((i, j[1]))
