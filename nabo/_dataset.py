@@ -394,13 +394,19 @@ class Dataset:
         return None
 
     def remove_cells(self, cell_names: List[str],
-                     verbose: bool = False) -> None:
+                     verbose: bool = False, update_cache: bool = True) -> None:
         """
-        Remove list of cells by providing their names
+        Remove list of cells by providing their names. Note that no data is
+        actully deleted from the dataset but just the keepCellsIdx attribute is
+        modified.
 
         :param cell_names: List of cell names to remove
         :param verbose: Print message about number of cells removed (
                         Default: False)
+        :param update_cache: If True then the 'keep_cells_idx' datatset in
+                             the H5 file is updated. This will overide the
+                             saved list of cells (keepCellsIdx) when the
+                             dataset is loaded in the future.
         :return:
         """
         rem_cells = []
@@ -424,7 +430,7 @@ class Dataset:
     def plot_raw(self, color: str = 'skyblue',
                  display_stats: bool = True, savename: str = None) -> None:
         """
-        Plot total expression, genes/cell, % mitochrondrial expression and
+        Plot total expression, genes/cell, % mitochondrial expression and
         % ribosomal expression fro each cell from raw data
 
         :return: None
