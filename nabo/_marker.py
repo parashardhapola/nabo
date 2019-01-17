@@ -116,7 +116,7 @@ def run_de_test(dataset1: Dataset, dataset2,
     return de[(de.qval < qval_thresh)].reset_index().drop(columns=['index'])
 
 
-def find_cluster_markers(graph: Graph, dataset1: Dataset,
+def find_cluster_markers(clusters: dict, dataset: Dataset,
                          de_frequency: int, exp_frac_thresh: float = 0.25,
                          log2_fc_thresh: float = 0.5,
                          qval_thresh: float = 0.05) -> (
@@ -139,7 +139,7 @@ def find_cluster_markers(graph: Graph, dataset1: Dataset,
              are lists of marker genes for the corresponding clusters
     """
     cluster_groups = {}
-    for k, v in graph.clusters.items():
+    for k, v in clusters.items():
         if v not in cluster_groups:
             cluster_groups[v] = []
         cluster_groups[v].append(k.rsplit('_', 1)[0])
@@ -156,7 +156,7 @@ def find_cluster_markers(graph: Graph, dataset1: Dataset,
         test_cells = cluster_groups[i]
         control_cells = [cluster_groups[x] for x in j]
 
-        de = run_de_test(dataset1, None, test_cells, control_cells,
+        de = run_de_test(dataset, None, test_cells, control_cells,
                          'Cluster %s' % str(i),
                          ['Cluster %s' % str(x) for x in j],
                          exp_frac_thresh=exp_frac_thresh,
