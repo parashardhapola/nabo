@@ -205,7 +205,8 @@ class Graph(nx.Graph):
             #            (v[1] - min_y) / (max_y - min_y))
             #        for k, v in pos.items()}
         for node in pos:
-            self.nodes[node]['pos'] = pos[node]
+            self.nodes[node]['pos'] = (float(pos[node][0]),
+                                       float(pos[node][1]))
         for node in self:
             if node not in pos:
                 self.nodes[node]['pos'] = None
@@ -357,15 +358,25 @@ class Graph(nx.Graph):
         :return: None
         """
         skipped_nodes = len(pos_dict)
+        error_nodes = 0
         for node in self.nodes:
             if node in pos_dict:
-                self.nodes[node]['pos'] = pos_dict[node]
-                skipped_nodes -= 1
+                try:
+                    self.nodes[node]['pos'] = (
+                        float(pos_dict[node][0]),
+                        float(pos_dict[node][1])
+                    )
+                    skipped_nodes -= 1
+                except (IndexError, TypeError):
+                    error_nodes += 1
             else:
                 self.nodes[node]['pos'] = None
         if skipped_nodes > 0:
             print('WARNING: %d cells do not exist in the reference graph and '
                   'their position info was not imported.' % skipped_nodes)
+            if error_nodes > 0:
+                print('WARNING: %d cells had position info in incorrect '
+                      'format' % error_nodes)
         return None
 
     def import_layout_from_json(self, fn):
@@ -407,8 +418,8 @@ class Graph(nx.Graph):
         pos_dict = {}
         for i in self.nodes(data=True):
             try:
-                pos_dict[i[0]] = tuple(i[1]['pos'])
-            except (KeyError, TypeError):
+                pos_dict[i[0]] = i[1]['pos']
+            except (KeyError, IndexError):
                 pos_dict[i[0]] = None
         return pos_dict
 
@@ -761,7 +772,8 @@ class Graph(nx.Graph):
         target_cells = {x: None for x in self.targetNodes[target]}
         mapped_cells = []
         for i in ref_cells:
-            i = i + '_' + self.refName
+            if remove_suffix:
+                i = i + '_' + self.refName
             for j in self.edges(i):
                 if j[1] in target_cells:
                     mapped_cells.append(j[1])
