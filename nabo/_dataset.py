@@ -98,13 +98,13 @@ class Dataset:
         else:
             pd_grp = h5.create_group('processed_data')
         if 'keep_cells_idx' in pd_grp and 'keep_genes_idx' in pd_grp:
-            self.keepCellsIdx = list(pd_grp['keep_cells_idx'][:])
-            self.keepGenesIdx = list(pd_grp['keep_genes_idx'][:])
+            self.keepCellsIdx = np.array(list(pd_grp['keep_cells_idx'][:]))
+            self.keepGenesIdx = np.array(list(pd_grp['keep_genes_idx'][:]))
             print("INFO: Cached filtered gene and cell names loaded",
                   flush=True)
         else:
-            self.keepCellsIdx = list(range(self.rawNCells))
-            self.keepGenesIdx = list(range(self.rawNGenes))
+            self.keepCellsIdx = np.array(list(range(self.rawNCells)))
+            self.keepGenesIdx = np.array(list(range(self.rawNGenes)))
         if 'sf' in pd_grp:
             self.sf = pd_grp['sf'][:]
             print("INFO: Cached cell size factors loaded", flush=True)
@@ -353,8 +353,6 @@ class Dataset:
                         ribo_low_cells + ribo_high_cells +
                         ngenes_low_cells + ngenes_high_cells)
         remove_cells = set(remove_cells)
-        # self.keepCellsIdx = np.array(
-        #     sorted(set(range(self.rawNCells)).difference(remove_cells)))
         self.keepCellsIdx = np.array(
              sorted(set(self.keepCellsIdx).difference(remove_cells)))
         if min_gene_abundance < 0:
@@ -368,8 +366,6 @@ class Dataset:
         if rm_ribo:
             remove_genes += [self.geneIdx[x] for x in self.riboGenes]
         remove_genes = set(remove_genes)
-        # self.keepGenesIdx = np.array(
-        #     sorted(set(range(self.rawNGenes)).difference(remove_genes)))
         self.keepGenesIdx = np.array(
              sorted(set(self.keepGenesIdx).difference(remove_genes)))
         if verbose:
@@ -394,7 +390,8 @@ class Dataset:
         return None
 
     def remove_cells(self, cell_names: List[str],
-                     verbose: bool = False, update_cache: bool = True) -> None:
+                     verbose: bool = False,
+                     update_cache: bool = False) -> None:
         """
         Remove list of cells by providing their names. Note that no data is
         actully deleted from the dataset but just the keepCellsIdx attribute is
@@ -409,22 +406,20 @@ class Dataset:
                              dataset is loaded in the future.
         :return:
         """
-        rem_cells = []
-        for i in cell_names:
-            if i in self.cellIdx:
-                rem_cells.append(self.cellIdx[i])
+        rem_cells = [self.cellIdx[i] for i in cell_names if i in self.cellIdx]
         num_keep_cells = len(self.keepCellsIdx)
         self.keepCellsIdx = np.array(sorted(
                 set(list(self.keepCellsIdx)).difference(rem_cells)))
         diff = num_keep_cells - len(self.keepCellsIdx)
         if verbose:
             print("%d cells removed" % diff)
-        h5: h5py.File = h5py.File(self.h5Fn, mode='a', libver='latest')
-        grp = h5['processed_data']
-        if 'keep_cells_idx' in grp:
-            del grp['keep_cells_idx']
-        grp.create_dataset('keep_cells_idx', data=self.keepCellsIdx)
-        h5.flush(), h5.close()
+        if update_cache:
+            h5: h5py.File = h5py.File(self.h5Fn, mode='a', libver='latest')
+            grp = h5['processed_data']
+            if 'keep_cells_idx' in grp:
+                del grp['keep_cells_idx']
+            grp.create_dataset('keep_cells_idx', data=self.keepCellsIdx)
+            h5.flush(), h5.close()
         return None
 
     def plot_raw(self, color: str = 'skyblue',
