@@ -145,11 +145,14 @@ class GraphPlot:
         self.removeAxes = remove_axes
         self.ax = ax
         self.verbose = verbose
+        self.removeWhenDone = True
 
         if self.ax is None:
             if self.verbose is True:
                 print('Making a new axis')
             _, self.ax = plt.subplots(1, 1, figsize=self.figSize)
+        else:
+            self.removeWhenDone = False
 
         keep_nodes = []
         for node in self.graph.nodes():
@@ -476,6 +479,14 @@ class GraphPlot:
     def _show_save(self):
         plt.tight_layout()
         if self.saveName is not None:
-            plt.savefig(self.saveName, dpi=self.dpi, transparent=True)
+            try:
+                plt.savefig(self.saveName, dpi=self.dpi, transparent=True)
+            except (IOError, OSError):
+                print ('ERROR: Could not save image. Please check that path '
+                       'is correct and you have write permission')
+                plt.show()
+                return None
         if self.showFig is True:
             plt.show()
+        elif self.removeWhenDone:
+            plt.close()
