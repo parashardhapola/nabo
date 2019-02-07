@@ -56,7 +56,7 @@ def cellranger_h5_to_mtx(h5, out_dir, genome='GRCh38'):
     OUT.close()
 
 
-def mtx_to_h5(in_dir: str, h5_fn: str, batch_size: int =10000,
+def mtx_to_h5(in_dir: str, h5_fn: str, batch_size: int = 10000,
               value_dtype=np.int64) -> None:
     """
     This is a wrapper function for MtxToH5 class which converts CellRanger's
@@ -74,8 +74,8 @@ def mtx_to_h5(in_dir: str, h5_fn: str, batch_size: int =10000,
     """
     temp = MtxToH5(in_dir=in_dir, h5_fn=h5_fn,
                    batch_size=batch_size, value_dtype=value_dtype)
-    temp._make_cell_index()
-    temp._make_gene_index()
+    temp.make_cell_index()
+    temp.make_gene_index()
     temp.h5.close(), temp.h.close()
     del temp
     return None
@@ -148,10 +148,10 @@ class MtxToH5:
     def _read_barcodes_genes(self):
         def read_genes(fn):
             try:
-                genes = np.genfromtxt(fn, dtype=str)[:, 1]
+                g = np.genfromtxt(fn, dtype=str)[:, 1]
             except (OSError, IOError, FileNotFoundError):
                 return False
-            return genes
+            return g
 
         for i in ['genes.tsv', 'genes.tsv.gz',
                   'features.tsv', 'features.tsv.gz']:
@@ -159,7 +159,7 @@ class MtxToH5:
             if genes is not False:
                 break
         if genes is not False:
-           genes = fix_dup_names(genes)
+            genes = fix_dup_names(genes)
         else:
             raise FileNotFoundError('ERROR: Could not file gene/features file')
         if len(genes) != self.nGenes:
@@ -171,7 +171,8 @@ class MtxToH5:
         except (OSError, IOError, FileNotFoundError):
             try:
                 cells = [x.decode('UTF-8').rstrip('\n').upper() for x in
-                     gzip.open('%s/barcodes.tsv.gz' % self.inDir).readlines()]
+                         gzip.open(
+                             '%s/barcodes.tsv.gz' % self.inDir).readlines()]
             except (OSError, IOError, FileNotFoundError):
                 raise FileNotFoundError(
                     'ERROR: Could not barcodes file')
@@ -180,7 +181,7 @@ class MtxToH5:
                 'Number of cells in barcodes.tsv not same as in the mtx file')
         return genes, cells
 
-    def _make_cell_index(self):
+    def make_cell_index(self):
 
         def _write_data(cd, data):
             data = np.array(data, dtype=self.dType)
@@ -202,7 +203,7 @@ class MtxToH5:
             _write_data(i[1], vec)
         return None
 
-    def _make_gene_index(self):
+    def make_gene_index(self):
 
         grp = self.h5.create_group("gene_data")
         idx_tracker = {x: 0 for x in self.genes}
@@ -210,7 +211,7 @@ class MtxToH5:
             grp.create_dataset(self.genes[i], shape=(self.FreqGenes[i],),
                                dtype=self.dType)
         gene_cache = {}
-        for i in tqdm(range(self.nCells+1), bar_format=tqdm_bar,
+        for i in tqdm(range(self.nCells + 1), bar_format=tqdm_bar,
                       desc='Saving gene-wise data          '):
             if i < self.nCells:
                 d = self.h5['cell_data'][self.cells[i]][:]
@@ -316,6 +317,7 @@ class CsvToH5:
                               dictionary
     :param skip_lines: Number of lines to skip from top of the file
     """
+
     def __init__(self, csv_fn: str, h5_fn: str, sep: str = ',',
                  inv_log: int = None, value_dtype: type = float,
                  null_thresh: float = None, batch_size: int = 500,
@@ -425,7 +427,7 @@ class CsvToH5:
                 vec[vec < self.nullThresh] = 0
             idx = np.nonzero(vec)[0]
             if self.invLog is not None:
-                vec[idx] = self.invLog**vec[idx]
+                vec[idx] = self.invLog ** vec[idx]
             self.colFreq[idx] += 1
             data = np.rec.fromarrays((idx, vec[idx]), names=('idx', 'val'))
             grp.create_dataset(row_name, data=data, chunks=None)
@@ -451,7 +453,8 @@ class CsvToH5:
             grp1.create_dataset(self.colNames[i],
                                 shape=(self.colFreq[i],), dtype=dtype)
         col_cache = {}
-        for i in tqdm(range(self.nRows+1), bar_format=tqdm_bar, desc=tqdm_msg):
+        for i in tqdm(range(self.nRows + 1), bar_format=tqdm_bar,
+                      desc=tqdm_msg):
             if i < self.nRows:
                 d = grp2[self.rowNames[i]][:]
                 for j in d:
@@ -470,7 +473,7 @@ class CsvToH5:
         return None
 
 
-def random_sample_h5(n: int, in_fn: str, out_fn: str, group: str='data'):
+def random_sample_h5(n: int, in_fn: str, out_fn: str, group: str = 'data'):
     """
     This is designed to downscale (subsample cells) from the HDF5 file
     containing PCA values.
@@ -490,7 +493,6 @@ def random_sample_h5(n: int, in_fn: str, out_fn: str, group: str='data'):
         grp.create_dataset(i, data=in_h5['data'][i][:])
     in_h5.close()
     out_h5.close()
-
 
 # def split_h5(in_fn: str, train_fn: str,
 #              test_fn: str, batch_size: int = 1000) -> None:
