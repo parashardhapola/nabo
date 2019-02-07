@@ -394,14 +394,15 @@ class Dataset:
                      update_cache: bool = False) -> None:
         """
         Remove list of cells by providing their names. Note that no data is
-        actully deleted from the dataset but just the keepCellsIdx attribute is
+        actually deleted from the dataset but just the keepCellsIdx
+        attribute is
         modified.
 
         :param cell_names: List of cell names to remove
         :param verbose: Print message about number of cells removed (
                         Default: False)
-        :param update_cache: If True then the 'keep_cells_idx' datatset in
-                             the H5 file is updated. This will overide the
+        :param update_cache: If True then the 'keep_cells_idx' dataset in
+                             the H5 file is updated. This will override the
                              saved list of cells (keepCellsIdx) when the
                              dataset is loaded in the future.
         :return:
@@ -410,8 +411,8 @@ class Dataset:
         num_keep_cells = len(self.keepCellsIdx)
         self.keepCellsIdx = np.array(sorted(
                 set(list(self.keepCellsIdx)).difference(rem_cells)))
-        diff = num_keep_cells - len(self.keepCellsIdx)
         if verbose:
+            diff = num_keep_cells - len(self.keepCellsIdx)
             print("%d cells removed" % diff)
         if update_cache:
             h5: h5py.File = h5py.File(self.h5Fn, mode='a', libver='latest')
@@ -419,6 +420,38 @@ class Dataset:
             if 'keep_cells_idx' in grp:
                 del grp['keep_cells_idx']
             grp.create_dataset('keep_cells_idx', data=self.keepCellsIdx)
+            h5.flush(), h5.close()
+        return None
+
+    def remove_genes(self, gene_names: List[str], verbose: bool = False,
+                     update_cache: bool = False) -> None:
+        """
+        Remove genes by providing their names. Note that no data is
+        actually deleted from the dataset but just the keepGenesIdx
+        attribute is
+        modified.
+        :param gene_names: List of gene names to remove
+        :param verbose: Print message about number of cells removed (
+                        Default: False)
+        :param update_cache: If True then the 'keep_genes_idx' dataset in
+                             the H5 file is updated. This will override the
+                             saved list of cells (keepCellsIdx) when the
+                             dataset is loaded in the future.
+        :return:
+        """
+        rem_genes = [self.geneIdx[i] for i in gene_names if i in self.geneIdx]
+        num_keep_genes = len(self.keepGenesIdx)
+        self.keepGenesIdx = np.array(sorted(
+            set(list(self.keepGenesIdx)).difference(rem_genes)))
+        if verbose:
+            diff = num_keep_genes - len(self.keepGenesIdx)
+            print("%d genes removed" % diff)
+        if update_cache:
+            h5: h5py.File = h5py.File(self.h5Fn, mode='a', libver='latest')
+            grp = h5['processed_data']
+            if 'keep_genes_idx' in grp:
+                del grp['keep_genes_idx']
+            grp.create_dataset('keep_genes_idx', data=self.keepGenesIdx)
             h5.flush(), h5.close()
         return None
 
