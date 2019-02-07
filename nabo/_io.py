@@ -5,6 +5,7 @@ from tqdm import tqdm
 from collections import Counter
 from typing import List
 import random
+import gzip
 
 __all__ = ['mtx_to_h5', 'csv_to_h5']
 
@@ -81,10 +82,6 @@ def mtx_to_h5(in_dir: str, h5_fn: str, batch_size: int =10000,
 
 
 class MtxToH5:
-    """
-
-    """
-
     def __init__(self, in_dir: str, h5_fn: str, batch_size: int,
                  value_dtype):
         """
@@ -102,41 +99,86 @@ class MtxToH5:
         self.h5FileName = h5_fn
         self.batchSize = batch_size
         self.dType = [('idx', np.uint), ('val', value_dtype)]
+        self.isZip = False
 
-        self.h = open("%s/matrix.mtx" % self.inDir)
-        self.h5 = self._make_fn()
-        self.h5.create_group('names')
-
+        self.h = self._open_mtx_file()
         self.nGenes, self.nCells, self.nVals, self.FreqGenes = self._get_info()
+        self.genes, self.cells = self._read_barcodes_genes()
 
-        self.cells = [x.rstrip('\n').upper() for x in open(
-                      '%s/barcodes.tsv' % self.inDir).readlines()]
-        if len(self.cells) != self.nCells:
-            raise ValueError(
-                'Number of cells in barcodes.tsv not same as in the mtx file')
+        self.h5 = self._make_h5()
+        self.h5.create_group('names')
+        self.h5['names'].create_dataset(
+            'genes', chunks=None, data=[x.encode("ascii") for x in self.genes])
         self.h5['names'].create_dataset(
             'cells', chunks=None, data=[x.encode("ascii") for x in self.cells])
 
-        self.genes = fix_dup_names(np.genfromtxt(
-            '%s/genes.tsv' % self.inDir, dtype=str)[:, 1])
-        if len(self.genes) != self.nGenes:
-            raise ValueError(
-                'Number of gene in genes.tsv not same as in the mtx file')
-        self.h5['names'].create_dataset(
-            'genes', chunks=None, data=[x.encode("ascii") for x in self.genes])
+    def _open_mtx_file(self):
+        try:
+            handle = open("%s/matrix.mtx" % self.inDir)
+        except (OSError, IOError, FileNotFoundError):
+            try:
+                handle = gzip.open("%s/matrix.mtx.gz" % self.inDir)
+                self.isZip = True
+            except (OSError, IOError, FileNotFoundError):
+                raise FileNotFoundError(
+                    'Could not find either either matrix.mtx or '
+                    'matrix.mtx.gz in %s' % self.inDir)
+        if self.isZip:
+            for l in handle:
+                yield l.decode('UTF-8').rstrip('\n')
+        else:
+            for l in handle:
+                yield l.rstrip('\n')
+        handle.close()
 
-    def _make_fn(self):
+    def _get_info(self):
+        while True:
+            line = next(self.h)
+            if line[0] != '%':
+                i = [int(x) for x in line.rstrip('\n').split(' ')]
+                return i[0], i[1], i[2], np.zeros(i[0])
+
+    def _make_h5(self):
         if os.path.isfile(self.h5FileName):
             print('Overwriting %s' % self.h5FileName, flush=True)
             os.remove(self.h5FileName)
         h5 = h5py.File(self.h5FileName, mode="a", libver='latest')
         return h5
 
-    def _get_info(self):
-        for l in self.h:
-            if l[0] != '%':
-                i = [int(x) for x in l.rstrip('\n').split(' ')]
-                return i[0], i[1], i[2], np.zeros(i[0])
+    def _read_barcodes_genes(self):
+        def read_genes(fn):
+            try:
+                genes = np.genfromtxt(fn, dtype=str)[:, 1]
+            except (OSError, IOError, FileNotFoundError):
+                return False
+            return genes
+
+        for i in ['genes.tsv', 'genes.tsv.gz',
+                  'features.tsv', 'features.tsv.gz']:
+            genes = read_genes(self.inDir + '/' + i)
+            if genes is not False:
+                break
+        if genes is not False:
+           genes = fix_dup_names(genes)
+        else:
+            raise FileNotFoundError('ERROR: Could not file gene/features file')
+        if len(genes) != self.nGenes:
+            raise ValueError(
+                'Number of gene in %s not same as in the mtx file' % i)
+        try:
+            cells = [x.rstrip('\n').upper() for x in open(
+                '%s/barcodes.tsv' % self.inDir).readlines()]
+        except (OSError, IOError, FileNotFoundError):
+            try:
+                cells = [x.decode('UTF-8').rstrip('\n').upper() for x in
+                     gzip.open('%s/barcodes.tsv.gz' % self.inDir).readlines()]
+            except (OSError, IOError, FileNotFoundError):
+                raise FileNotFoundError(
+                    'ERROR: Could not barcodes file')
+        if len(cells) != self.nCells:
+            raise ValueError(
+                'Number of cells in barcodes.tsv not same as in the mtx file')
+        return genes, cells
 
     def _make_cell_index(self):
 
@@ -151,7 +193,7 @@ class MtxToH5:
         i = None
         for l in tqdm(self.h, total=self.nVals, bar_format=tqdm_bar,
                       desc='Saving cell-wise data          '):
-            i = l.rstrip('\n').split(' ')
+            i = l.split(' ')
             if i[1] != prev_cell:
                 _write_data(prev_cell, vec)
                 prev_cell, vec = i[1], []
