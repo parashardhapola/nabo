@@ -217,7 +217,6 @@ class MtxToH5:
                 d = self.h5['cell_data'][self.cells[i]][:]
                 for j in d:
                     gene = self.genes[j[0]]
-                    print(j, i)
                     if gene not in gene_cache:
                         gene_cache[gene] = []
                     gene_cache[gene].append((i, j[1]))
