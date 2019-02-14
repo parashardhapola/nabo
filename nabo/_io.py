@@ -493,6 +493,92 @@ def random_sample_h5(n: int, in_fn: str, out_fn: str, group: str = 'data'):
     in_h5.close()
     out_h5.close()
 
+
+def merge_h5(h5_fns, merged_fn, prefixes=None):
+    handles = [h5py.File(x, 'r') for x in h5_fns]
+    merged = h5py.File(merged_fn, 'w')
+
+    required_keys = ['gene_data', 'cell_data', 'names/cells', 'names/genes']
+    for n, h in enumerate(handles):
+        for i in required_keys:
+            if i not in h:
+                [x.close() for x in handles]
+                merged.close()
+                raise KeyError(
+                    'ERROR: Group %s missing in file %s' % (i, h5_fns[n]))
+
+    if prefixes is None:
+        prefixes = [str(x + 1) for x in range(len(h5_fns))]
+    elif len(prefixes) != len(h5_fns):
+        [x.close() for x in handles]
+        merged.close()
+        raise ValueError(
+            "ERROR: Number of prefixes not same as number of input H5 files")
+
+    print('Creating gene indices', flush=True)
+    union_genes = set(handles[0]['names/genes'][:])
+    for h in handles[1:]:
+        union_genes.union(h['names/genes'][:])
+    union_genes = sorted([x.decode('UTF-8') for x in union_genes])
+    ugk = {x: n for n, x in enumerate(union_genes)}
+    ugk_maps = []
+    for h in handles:
+        temp_ugk_map = {}
+        for n, g in enumerate(h['names/genes']):
+            temp_ugk_map[n] = ugk[g.decode('UTF-8')]
+        ugk_maps.append(temp_ugk_map)
+
+    print('Creating cell indices', flush=True)
+    union_cells = []
+    for n, h in enumerate(handles):
+        union_cells.extend([x.decode('UTF-8') + '-' + prefixes[n] for x in
+                            h['names/cells'][:]])
+    union_cells = random.sample(union_cells, len(union_cells))
+    uck = {x: n for n, x in enumerate(union_cells)}
+    uck_maps = []
+    for n, h in enumerate(handles):
+        temp_uck_map = {}
+        for n2, c in enumerate(h['names/cells']):
+            temp_uck_map[n2] = uck[c.decode('UTF-8') + '-' + prefixes[n]]
+        uck_maps.append(temp_uck_map)
+
+    merged.create_group('names')
+    merged['names'].create_dataset(
+        'genes', chunks=None,
+        data=[str(x).encode("ascii") for x in union_genes])
+    merged['names'].create_dataset(
+        'cells', chunks=None,
+        data=[str(x).encode("ascii") for x in union_cells])
+
+    print('Saving gene data', flush=True)
+    grp = merged.create_group("gene_data")
+    for g in tqdm(union_genes):
+        data = []
+        for n, h in enumerate(handles):
+            try:
+                d = h['gene_data'][g][:]
+            except KeyError:
+                continue
+            else:
+                d['idx'] = [uck_maps[n][x] for x in d['idx']]
+                data.append(d)
+        grp.create_dataset(g, data=np.concatenate(data), chunks=None)
+
+    print('Saving cell data', flush=True)
+    grp = merged.create_group("cell_data")
+    for n, h in enumerate(handles):
+        for c in tqdm(h['cell_data'], desc=prefixes[n]):
+            data = h['cell_data'][c][:]
+            data['idx'] = [ugk_maps[n][x] for x in data['idx']]
+            grp.create_dataset(c + '-' + prefixes[n], data=data, chunks=None)
+
+    [x.close() for x in handles]
+    merged.close()
+
+    return True
+
+
+
 # def split_h5(in_fn: str, train_fn: str,
 #              test_fn: str, batch_size: int = 1000) -> None:
 #     """
