@@ -494,7 +494,7 @@ def random_sample_h5(n: int, in_fn: str, out_fn: str, group: str = 'data'):
     out_h5.close()
 
 
-def merge_h5(h5_fns, merged_fn, prefixes=None):
+def merge_h5(h5_fns, merged_fn, cell_suffixes=None):
     handles = [h5py.File(x, 'r') for x in h5_fns]
     merged = h5py.File(merged_fn, 'w')
 
@@ -507,13 +507,14 @@ def merge_h5(h5_fns, merged_fn, prefixes=None):
                 raise KeyError(
                     'ERROR: Group %s missing in file %s' % (i, h5_fns[n]))
 
-    if prefixes is None:
-        prefixes = [str(x + 1) for x in range(len(h5_fns))]
-    elif len(prefixes) != len(h5_fns):
+    if cell_suffixes is None:
+        cell_suffixes = [str(x + 1) for x in range(len(h5_fns))]
+    elif len(cell_suffixes) != len(h5_fns):
         [x.close() for x in handles]
         merged.close()
         raise ValueError(
-            "ERROR: Number of prefixes not same as number of input H5 files")
+            "ERROR: Number of cell_suffixes not same as number of input H5 "
+            "files")
 
     print('Creating gene indices', flush=True)
     union_genes = set(handles[0]['names/genes'][:])
@@ -531,7 +532,7 @@ def merge_h5(h5_fns, merged_fn, prefixes=None):
     print('Creating cell indices', flush=True)
     union_cells = []
     for n, h in enumerate(handles):
-        union_cells.extend([x.decode('UTF-8') + '-' + prefixes[n] for x in
+        union_cells.extend([x.decode('UTF-8') + '-' + cell_suffixes[n] for x in
                             h['names/cells'][:]])
     union_cells = random.sample(union_cells, len(union_cells))
     uck = {x: n for n, x in enumerate(union_cells)}
@@ -539,7 +540,7 @@ def merge_h5(h5_fns, merged_fn, prefixes=None):
     for n, h in enumerate(handles):
         temp_uck_map = {}
         for n2, c in enumerate(h['names/cells']):
-            temp_uck_map[n2] = uck[c.decode('UTF-8') + '-' + prefixes[n]]
+            temp_uck_map[n2] = uck[c.decode('UTF-8') + '-' + cell_suffixes[n]]
         uck_maps.append(temp_uck_map)
 
     merged.create_group('names')
@@ -567,10 +568,11 @@ def merge_h5(h5_fns, merged_fn, prefixes=None):
     print('Saving cell data', flush=True)
     grp = merged.create_group("cell_data")
     for n, h in enumerate(handles):
-        for c in tqdm(h['cell_data'], desc=prefixes[n]):
+        for c in tqdm(h['cell_data'], desc=cell_suffixes[n]):
             data = h['cell_data'][c][:]
             data['idx'] = [ugk_maps[n][x] for x in data['idx']]
-            grp.create_dataset(c + '-' + prefixes[n], data=data, chunks=None)
+            grp.create_dataset(c + '-' + cell_suffixes[n], data=data,
+                               chunks=None)
 
     [x.close() for x in handles]
     merged.close()
@@ -578,84 +580,40 @@ def merge_h5(h5_fns, merged_fn, prefixes=None):
     return True
 
 
+def extract_cells_from_h5(in_fn: str, out_fn: str,
+                         coi: list) -> None:
+    coi = {x: None for x in coi}
+    ih = h5py.File(in_fn, 'r')
+    oh = h5py.File(out_fn, 'w')
+    in_cells = {x.decode('UTF-8'): n for n, x in enumerate(ih['names/cells'])}
+    out_cells = [x for x in in_cells if x in coi]
 
-# def split_h5(in_fn: str, train_fn: str,
-#              test_fn: str, batch_size: int = 1000) -> None:
-#     """
-#     Broken code. Need to to be fixed. Remember to put in __all__ after fixing
-#
-#     :param in_fn:
-#     :param train_fn:
-#     :param test_fn:
-#     :param batch_size:
-#     :return:
-#     """
-#     def make_gene_index(h, g, c, fqg, bs):
-#         grp = h.create_group("gene_data")
-#         idx_tracker = {x: 0 for x in g}
-#         n_genes = len(g)
-#         n_cells = len(c)
-#         for x in range(n_genes):
-#             grp.create_dataset(g[x], shape=(fqg[x], 2), dtype=np.uint32)
-#         gene_cache = {}
-#         for x in tqdm(range(n_cells + 1), bar_format=tqdm_bar,
-#                       desc='Saving gene-wise data          '):
-#             if x < n_cells:
-#                 d = h['cell_data'][c[x]][:]
-#                 for j in d:
-#                     gene = g[j[0]]
-#                     if gene not in gene_cache:
-#                         gene_cache[gene] = []
-#                     gene_cache[gene].append((x, j[1]))
-#             if (x != 0 and x % bs == 0) or x == n_cells:
-#                 for gene in gene_cache:
-#                     dataset = grp[gene]
-#                     idx = idx_tracker[gene]
-#                     new_idx = idx + len(gene_cache[gene])
-#                     dataset[idx:new_idx] = gene_cache[gene]
-#                     idx_tracker[gene] = new_idx
-#                 gene_cache = {}
-#         return None
-#
-#     h5 = h5py.File(in_fn)
-#     if os.path.isfile(train_fn):
-#         os.remove(train_fn)
-#     train_h5 = h5py.File(train_fn)
-#     if os.path.isfile(test_fn):
-#         os.remove(test_fn)
-#     test_h5 = h5py.File(test_fn)
-#
-#     cells = np.array([x.decode('UTF8') for x in h5['names']['cells']])
-#     genes = np.array([x.decode('UTF8') for x in h5['names']['genes']])
-#     train_cells = np.random.choice(cells, 6000, replace=False)
-#     test_cells = list(set(cells).difference(train_cells))
-#     print("Train cells %d, Test cells %d" % (len(train_cells),
-#                                              len(test_cells)), flush=True)
-#
-#     train_h5.create_dataset('cells', chunks=None,
-#                             data=[x.encode("ascii") for x in train_cells])
-#     test_h5.create_dataset('cells', chunks=None,
-#                            data=[x.encode("ascii") for x in test_cells])
-#     train_h5.create_dataset('genes', chunks=None,
-#                             data=[x.encode("ascii") for x in genes])
-#     test_h5.create_dataset('genes', chunks=None,
-#                            data=[x.encode("ascii") for x in genes])
-#     train_freq_genes = np.zeros(len(genes))
-#     test_freq_genes = np.zeros(len(genes))
-#     train_h5.create_group('cell_data')
-#     test_h5.create_group('cell_data')
-#     for i in tqdm(train_cells, bar_format=tqdm_bar,
-#                   desc='Saving train data              '):
-#         data = h5['cell_data'][i][:]
-#         train_h5['cell_data'].create_dataset(i, data=data, chunks=None,
-#                                              dtype=np.uint32)
-#         train_freq_genes[data[:, 0]] += 1
-#     for i in tqdm(test_cells, bar_format=tqdm_bar,
-#                   desc='Saving test data               '):
-#         data = h5['cell_data'][i][:]
-#         test_h5['cell_data'].create_dataset(i, data=data, chunks=None,
-#                                             dtype=np.uint32)
-#         test_freq_genes[data[:, 0]] += 1
-#     make_gene_index(train_h5, genes, train_cells,
-#                     train_freq_genes, batch_size)
-#     make_gene_index(test_h5, genes, test_cells, test_freq_genes, batch_size)
+    if len(out_cells) == 0:
+        raise ValueError(
+            "ERROR: None of the input cells were found in the H5 file")
+    if len(out_cells) != len(coi):
+        print("WARNING: only %d/%d cells found in the H5 file" % (
+            len(out_cells), len(coi)))
+    cell_idx_map = {in_cells[x]: n for n, x in enumerate(out_cells)}
+
+    oh.create_group('names')
+    oh['names'].create_dataset(
+        'genes', chunks=None, data=list(ih['names/genes']))
+    oh['names'].create_dataset(
+        'cells', chunks=None, data=[x.encode("ascii") for x in out_cells])
+
+    grp = oh.create_group("cell_data")
+    for i in tqdm(out_cells):
+        grp.create_dataset(i, data=ih['cell_data'][i], chunks=None)
+
+    grp = oh.create_group("gene_data")
+    for g in tqdm(ih['gene_data']):
+        data = []
+        d = ih['gene_data'][g][:]
+        for i in d:
+            if i[0] in cell_idx_map:
+                data.append((cell_idx_map[i[0]], i[1]))
+        grp.create_dataset(g, data=np.array(data, dtype=d.dtype), chunks=None)
+
+    ih.close(), oh.close()
+    return None
