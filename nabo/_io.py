@@ -7,7 +7,7 @@ from typing import List
 import random
 import gzip
 
-__all__ = ['mtx_to_h5', 'csv_to_h5']
+__all__ = ['mtx_to_h5', 'csv_to_h5', 'merge_h5', 'extract_cells_from_h5']
 
 tqdm_bar = '{l_bar} {remaining}'
 
@@ -494,7 +494,16 @@ def random_sample_h5(n: int, in_fn: str, out_fn: str, group: str = 'data'):
     out_h5.close()
 
 
-def merge_h5(h5_fns, merged_fn, cell_suffixes=None):
+def merge_h5(h5_fns: List[str], merged_fn: str, cell_suffixes=None) -> None:
+    """
+    Merge multiple Nabo's dataset h5 files
+
+    :param h5_fns: List containing names of input files to be merged
+    :param merged_fn: Output file name
+    :param cell_suffixes: A list containing strings (same number as number
+                          of H5 files) to be appended to each cell's name
+    :return: None
+    """
     handles = [h5py.File(x, 'r') for x in h5_fns]
     merged = h5py.File(merged_fn, 'w')
 
@@ -577,11 +586,20 @@ def merge_h5(h5_fns, merged_fn, cell_suffixes=None):
     [x.close() for x in handles]
     merged.close()
 
-    return True
+    return None
 
 
 def extract_cells_from_h5(in_fn: str, out_fn: str,
-                         coi: list) -> None:
+                         coi: List[str]) -> None:
+    """
+    Extract data for given cells from a H5 file and create a new H5 file
+    with the cell subset
+
+    :param in_fn: Input H5 filename
+    :param out_fn: Output H5 file name
+    :param coi: cellnames to be extracted
+    :return:
+    """
     coi = {x: None for x in coi}
     ih = h5py.File(in_fn, 'r')
     oh = h5py.File(out_fn, 'w')
