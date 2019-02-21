@@ -578,7 +578,8 @@ class Dataset:
                         'm': temp.mean(),
                         'nzm': temp[idx].mean(),
                         'variance': temp.var(),
-                        'valid_gene': True
+                        'valid_gene': True,
+                        'ncells': (temp > 0).sum()
                     }
             else:
                 stats[gene] = {'valid_gene': False}
@@ -590,6 +591,7 @@ class Dataset:
         stats.m = stats.m.fillna(stats.m.min())
         stats.nzm = stats.nzm.fillna(stats.nzm.min())
         stats.variance = stats.variance.fillna(stats.variance.min())
+        stats.ncells = stats.ncells.fillna(0)
         self.geneStats = stats
         return None
 
@@ -640,7 +642,8 @@ class Dataset:
     def find_hvgs(
             self, var_min_thresh: float = None, nzm_min_thresh: float = None,
             var_max_thresh: float = np.inf, nzm_max_thresh: float = np.inf,
-            plot: bool = True, use_corrected_var: bool = False) -> None:
+            min_cells: int = 0, plot: bool = True,
+            use_corrected_var: bool = False) -> None:
         """
         Identifies highly variable genes using cutoff provided for corrected
         variance and non-zero mean expression. Saves the result in attribute
@@ -653,6 +656,8 @@ class Dataset:
         :param nzm_min_thresh: Minimum non-zero mean
         :param var_max_thresh: Maximum corrected variance
         :param nzm_max_thresh: Minimum non-zero mean
+        :param min_cells: Minimum number of cells where a gene should have
+                        non-zero value
         :param plot: if True then a scatter plots of mean and variance are
                      displayed highlighting the gene datapoints that were
                      selected as HVGs in blue.
@@ -669,7 +674,9 @@ class Dataset:
         gene_stats = self.geneStats[self.geneStats['valid_gene']].drop(
             columns=['valid_gene'])
         if use_corrected_var:
+            temp = gene_stats['ncells'].copy()
             gene_stats = gene_stats.apply(np.log)
+            gene_stats['ncells'] = temp
         if nzm_min_thresh is None:
             nzm_min_thresh = np.percentile(gene_stats['nzm'], 5)
         if var_min_thresh is None:
@@ -681,13 +688,15 @@ class Dataset:
             hvg_candidates = (gene_stats['fixed_var'] > var_min_thresh) & \
                              (gene_stats['nzm'] > nzm_min_thresh) & \
                              (gene_stats['fixed_var'] < var_max_thresh) & \
-                             (gene_stats['nzm'] < nzm_max_thresh)
+                             (gene_stats['nzm'] < nzm_max_thresh) & \
+                             (gene_stats['ncells'] > min_cells)
         else:
             vmr = gene_stats['variance']/gene_stats['m']
             hvg_candidates = (vmr > var_min_thresh) & \
                              (gene_stats['nzm'] > nzm_min_thresh) & \
                              (vmr < var_max_thresh) & \
-                             (gene_stats['nzm'] < nzm_max_thresh)
+                             (gene_stats['nzm'] < nzm_max_thresh) & \
+                             (gene_stats['ncells'] > min_cells)
         if plot and use_corrected_var:
             plot_mean_var(gene_stats, hvg_candidates, var_min_thresh,
                           nzm_min_thresh, var_max_thresh, nzm_max_thresh,
