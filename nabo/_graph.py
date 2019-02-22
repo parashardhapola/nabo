@@ -283,7 +283,7 @@ class Graph(nx.Graph):
                                 Default: True)
         :return: None
         """
-        df = pd.read_csv(csv, index_col=0, sep=csv_sep)
+        df = pd.read_csv(csv, index_col=0, sep=csv_sep, header=None)
         cluster_dict = df[df.columns[cluster_col]].to_dict()
         if append_ref_name:
             cluster_dict = {k + '_' + self.refName: v for
@@ -388,25 +388,25 @@ class Graph(nx.Graph):
         return self.import_layout(json.load(open(fn)))
 
     def import_layout_from_csv(self, csv: str, csv_sep: str = ',',
-                               cluster_col: int = 0,
-                               append_ref_name: bool = True):
+                               append_ref_name: bool = False):
         """
+        Import graph layout coordinates from a CSV file
+
         :param csv: Filename containing layout coordinates. Make
                     sure that the first column contains cell names and
-                    second contains the cluster labels.
+                    second and thrid contain the x and y coordinates
         :param csv_sep: Separator for CSV file (default: ',')
-        :param cluster_col: Column number (0 based count) where cluster
-                            info is present (Default: 0)
         :param append_ref_name: Append the reference name to the cell name (
                                 Default: True)
         :return: None
         """
-        df = pd.read_csv(csv, index_col=0, sep=csv_sep)
-        pos_dict = df[df.columns[cluster_col]].to_dict()
+        layout = pd.read_csv(csv, index_col=0, sep=csv_sep, header=None)
         if append_ref_name:
-            pos_dict = {k + '_' + self.refName: v for
-                            k, v in pos_dict.items()}
-        return self.import_layout(pos_dict)
+            layout = {x + '_' + self.refName: (layout[1][x], layout[2][x])
+                      for x in layout.index}
+        else:
+            layout = {x: (layout[1][x], layout[2][x]) for x in layout.index}
+        return self.import_layout(layout)
 
     @property
     def layout(self):
@@ -435,11 +435,12 @@ class Graph(nx.Graph):
 
     def save_layout_as_csv(self, out_fn):
         """
+        Saves the layout in CSV format
 
         :param out_fn: Output CSV file
         :return:
         """
-        pd.Series(self.layout).to_csv(out_fn)
+        pd.DataFrame(self.layout).T.to_csv(out_fn, header=None)
         return None
 
     @staticmethod
