@@ -478,7 +478,7 @@ class Dataset:
               % (self.rawNCells, self.rawNGenes), flush=True)
         return None
 
-    def plot_filtered(self, color: str = 'skyblue',
+    def plot_filtered(self, color: str = 'coral',
                       display_stats: bool = True,
                       savename: str = None) -> None:
         """
