@@ -125,8 +125,8 @@ def find_cluster_markers(clusters: dict, dataset: Dataset,
     Identifies marker genes for each cluster in a Graph. This function works a
     wrapper for `run_de_test`.
 
-    :param graph: nabo.Graph
-    :param dataset1: nabo.Dataset
+    :param clusters: dict
+    :param dataset: nabo.Dataset
     :param de_frequency: Minimum number of clusters against a gene should be
                          significantly differentially expressed for it to
                          qualify as a marker
