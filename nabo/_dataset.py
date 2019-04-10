@@ -116,10 +116,10 @@ class Dataset:
         h5.close()
         if self._mito_patterns is None:
             self._mito_patterns = ['^MT-']
-        self.mitoGenes = self._get_genes_by_pattern(self._mito_patterns)
+        self.mitoGenes = self.get_genes_by_pattern(self._mito_patterns)
         if self._ribo_patterns is None:
             self._ribo_patterns = ['^RPS', '^RPL', '^MRPS', '^MRPL']
-        self.riboGenes = self._get_genes_by_pattern(self._ribo_patterns)
+        self.riboGenes = self.get_genes_by_pattern(self._ribo_patterns)
         return True
 
     def update_exp_suffix(self, suffix: str, delimiter: str = '_') -> None:
@@ -264,7 +264,7 @@ class Dataset:
         h5.close()
         return a
 
-    def _get_genes_by_pattern(self, patterns: List[str]) -> List[str]:
+    def get_genes_by_pattern(self, patterns: List[str]) -> List[str]:
         """
 
         :param patterns: List of Regex pattern
@@ -389,14 +389,12 @@ class Dataset:
         h5.flush(), h5.close()
         return None
 
-    def remove_cells(self, cell_names: List[str],
-                     verbose: bool = False,
-                     update_cache: bool = False) -> None:
+    def remove_cells(self, cell_names: List[str], update_cache: bool = False,
+                     verbose: bool = False) -> None:
         """
         Remove list of cells by providing their names. Note that no data is
         actually deleted from the dataset but just the keepCellsIdx
-        attribute is
-        modified.
+        attribute is modified.
 
         :param cell_names: List of cell names to remove
         :param verbose: Print message about number of cells removed (
@@ -423,8 +421,8 @@ class Dataset:
             h5.flush(), h5.close()
         return None
 
-    def remove_genes(self, gene_names: List[str], verbose: bool = False,
-                     update_cache: bool = False) -> None:
+    def remove_genes(self, gene_names: List[str], update_cache: bool = False,
+                     verbose: bool = False) -> None:
         """
         Remove genes by providing their names. Note that no data is
         actually deleted from the dataset but just the keepGenesIdx
@@ -497,12 +495,12 @@ class Dataset:
                       '% mitochondrial genes', ' % ribosomal genes']
         plot_summary_data([tot_exp_per_cell, genes_per_cell,
                            percent_mito, percent_ribo], plot_names, color,
-                          display_stats, savename)
+                           display_stats, savename)
         print("The dataset contains: %d cells and %d genes"
               % (len(self.keepCellsIdx), len(self.keepGenesIdx)), flush=True)
         return None
 
-    def set_sf(self, sf: Dict[str, float] = None, size_scale: float = 10000.0,
+    def set_sf(self, sf: Dict[str, float] = None, size_scale: float = 1000.0,
                all_genes: bool = False) -> None:
         """
         Set size factor for each cell. Updates `sf` attribute
@@ -511,7 +509,7 @@ class Dataset:
                    'cell_data' group of H5 file and values as size factor for
                    the corresponding cell to be used for normalization.
         :param size_scale: Values are scaled to this factor after
-                           normalization using size factor (default: 10000,
+                           normalization using size factor (default: 1000,
                            set to None to disable size scaling).
         :param all_genes: Use expression values from all genes, even those
                           which were filtered out, to calculate size factor.
