@@ -19,3 +19,4 @@ sphinxcontrib-websupport
 statsmodels>=0.9.0
 tqdm>=4.23.3
 datashader
+umap-learn
