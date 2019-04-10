@@ -7,10 +7,16 @@ import pandas as pd
 import re
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from sklearn.decomposition import IncrementalPCA
+import numba
 
 __all__ = ['Dataset']
 
 tqdm_bar = '{l_bar} {remaining}'
+
+@numba.jit()
+def clr(X):
+    g = np.exp(np.log(X+1).mean())
+    return np.log((X+1)/g)
 
 
 class ExpDict(dict):
@@ -276,8 +282,8 @@ class Dataset:
                 [x for x in self.genes if re.match(sp, x) is not None])
         return sorted(set(genes))
 
-    def export_as_dataframe(self, genes: List[str],
-                            normalized: bool = True) -> pd.DataFrame:
+    def export_as_dataframe(self, genes: List[str], normalized: bool = True,
+                            clr_normed: bool = False) -> pd.DataFrame:
         """
 
         :param genes:
@@ -295,11 +301,13 @@ class Dataset:
                 continue
             a = self._get_empty_cell_array()
             a[d['idx']] = d['val']
-            if normalized:
+            if normalized is True and clr_normed is False:
                 a = a * self.sf
             values.append(a[self.keepCellsIdx])
             saved_genes.append(gene)
         h5.close()
+        if clr_normed:
+            values = np.array(values)
         return pd.DataFrame(
             values, index=saved_genes,
             columns=[self.cells[x] for x in self.keepCellsIdx]).T
