@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d # Needed for 3D UMAPS
 import seaborn as sns
 import numpy as np
 from typing import Dict
@@ -7,7 +8,7 @@ from natsort import natsorted, ns
 
 __all__ = ['plot_summary_data', 'plot_mean_var', 'plot_scree',
            'plot_cluster_scores', 'plot_target_class_counts',
-           'plot_box_exp']
+           'plot_box_exp', 'plot_3dumap']
 
 
 def clean_axis(ax, ts=11, ga=0.4):
@@ -184,3 +185,48 @@ def plot_box_exp(dataset, gene, groups, group_names,
         fig.savefig(save_name, bbox_inches='tight', dpi=dpi, transparent=True)
     plt.show()
     return None
+
+
+def plot_3dumap(dims, figsize=(6, 6), vc='k', vs=15,
+                cmap='magma', ec=None, lw=0.1,
+                title=None, title_fs=10,
+                text_coords=None, text_fs=9,
+                axis_labels=None, axis_labels_fs=8,
+                alpha=0.7, grid_alpha=0.4,
+                cbar=False, orient=None,
+                savename=None, dpi=300):
+    if cbar:
+        fig = plt.figure(figsize=(figsize[0]+1, figsize))
+    else:
+        fig = plt.figure(figsize=figsize)
+    ax = fig.add_subplot(1, 1, 1, projection='3d')
+    p = ax.scatter3D(dims.Dim1, dims.Dim2, dims.Dim3, s=vs, c=vc, cmap=cmap,
+                     linewidths=lw, edgecolor=ec, alpha=alpha)
+    ax.figure.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+    for i in [ax.xaxis, ax.yaxis, ax.zaxis]:
+        i.set_pane_color((1.0, 1.0, 1.0, 0.0))
+        i._axinfo["grid"]['linestyle'] = '--'
+        i._axinfo["grid"]['color'] = (0, 0, 0, 0.1)
+        i.set_tick_params(labelsize=6)
+    ax.grid(which='major', linestyle='--', alpha=grid_alpha)
+    if axis_labels is None:
+        axis_labels = ['UMAP1', 'UMAP2', 'UMAP3']
+    ax.set_xlabel(axis_labels[0], fontsize=axis_labels_fs)
+    ax.set_ylabel(axis_labels[1], fontsize=axis_labels_fs)
+    ax.set_zlabel(axis_labels[2], fontsize=axis_labels_fs)
+    if orient is not None:
+        ax.view_init(orient[0], orient[1])
+    if title is not None:
+        ax.set_title(title, fontsize=title_fs)
+    if text_coords is not None:
+        for i in text_coords:
+            v = text_coords[i].values
+            ax.text(v[0], v[1], v[2], i, fontsize=text_fs)
+    if cbar:
+        fig.colorbar(p)
+    if savename is None:
+        plt.show()
+    else:
+        fig.savefig(savename, dpi=dpi)
+        plt.close()
