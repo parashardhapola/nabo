@@ -13,10 +13,11 @@ __all__ = ['Dataset']
 
 tqdm_bar = '{l_bar} {remaining}'
 
+
 @numba.jit()
 def clr(X):
-    g = np.exp(np.log(X+1).mean())
-    return np.log((X+1)/g)
+    g = np.exp(np.log(X + 1).mean())
+    return np.log((X + 1) / g)
 
 
 class ExpDict(dict):
@@ -272,6 +273,7 @@ class Dataset:
 
     def get_genes_by_pattern(self, patterns: List[str]) -> List[str]:
         """
+        Get names of genes that match the pattern
 
         :param patterns: List of Regex pattern
         :return: List of gene names matching the pattern
@@ -285,10 +287,12 @@ class Dataset:
     def export_as_dataframe(self, genes: List[str], normalized: bool = True,
                             clr_normed: bool = False) -> pd.DataFrame:
         """
-
-        :param genes:
-        :param normalized:
-        :return:
+        Export data for given genes. Data is exported only for cells
+        that are present in keepCellsIdx attribute.
+        :param genes: Genes to be exported
+        :param normalized: Perform library size normalization (default: True)
+        :param clr_normed: Perform CLR normalization (default: False)
+        :return: Pandas dataframe with cells as rows and genes as columns
         """
 
         h5: h5py.File = h5py.File(self.h5Fn, mode='r', libver='latest')
@@ -311,6 +315,24 @@ class Dataset:
         return pd.DataFrame(
             values, index=saved_genes,
             columns=[self.cells[x] for x in self.keepCellsIdx]).T
+
+    def get_cell_lib(self, hto_patterns: List[str],
+                     min_ratio: float = 0.5) -> pd.Series:
+        """
+        Get cell library based on hashtag ratios
+        :param hto_patterns: Pattern to search for hastags
+        :param min_ratio: Minimum ratio (0.5)
+        :return: Pandas series
+        """
+        hto_names = self.get_genes_by_pattern(hto_patterns)
+        hto = self.export_as_dataframe(hto_names, normalized=False)
+        ratio = (hto.T / hto.sum(axis=1)).T
+        valid_cells = (ratio > min_ratio).sum(axis=1) == 1
+        ratio = ratio[valid_cells]
+        cell_lib = ratio.idxmax(axis=1)
+        print("INFO: Predicted library for %d/%d cells" %
+              (len(cell_lib), len(self.keepCellsIdx)))
+        return cell_lib
 
     def filter_data(self, min_exp: int = 1000, max_exp: int = np.inf,
                     min_ngenes: int = 100, max_ngenes: int = np.inf,
@@ -362,7 +384,7 @@ class Dataset:
                         ngenes_low_cells + ngenes_high_cells)
         remove_cells = set(remove_cells)
         self.keepCellsIdx = np.array(
-             sorted(set(self.keepCellsIdx).difference(remove_cells)))
+            sorted(set(self.keepCellsIdx).difference(remove_cells)))
         if min_gene_abundance < 0:
             print("'min_gene_abundance' should be greater than or equal to 0")
             print("Resetting 'min_gene_abundance' to 0", flush=True)
@@ -375,7 +397,7 @@ class Dataset:
             remove_genes += [self.geneIdx[x] for x in self.riboGenes]
         remove_genes = set(remove_genes)
         self.keepGenesIdx = np.array(
-             sorted(set(self.keepGenesIdx).difference(remove_genes)))
+            sorted(set(self.keepGenesIdx).difference(remove_genes)))
         if verbose:
             print("UMI filtered  : Low: %d High: %d" % (
                 len(umi_low_cells), len(umi_high_cells)), flush=True)
@@ -416,7 +438,7 @@ class Dataset:
         rem_cells = [self.cellIdx[i] for i in cell_names if i in self.cellIdx]
         num_keep_cells = len(self.keepCellsIdx)
         self.keepCellsIdx = np.array(sorted(
-                set(list(self.keepCellsIdx)).difference(rem_cells)))
+            set(list(self.keepCellsIdx)).difference(rem_cells)))
         if verbose:
             diff = num_keep_cells - len(self.keepCellsIdx)
             print("%d cells removed" % diff)
@@ -503,7 +525,7 @@ class Dataset:
                       '% mitochondrial genes', ' % ribosomal genes']
         plot_summary_data([tot_exp_per_cell, genes_per_cell,
                            percent_mito, percent_ribo], plot_names, color,
-                           display_stats, savename)
+                          display_stats, savename)
         print("The dataset contains: %d cells and %d genes"
               % (len(self.keepCellsIdx), len(self.keepGenesIdx)), flush=True)
         return None
@@ -637,7 +659,7 @@ class Dataset:
         fixed_var = {}
         for bcf, genes in zip(bin_cor_fac, bin_genes):
             for gene in genes:
-                fixed_var[gene] = np.e**(stats.variance[gene] - bcf)
+                fixed_var[gene] = np.e ** (stats.variance[gene] - bcf)
         self.geneStats['fixed_var'] = pd.Series(fixed_var)
         self.geneStats.fixed_var = self.geneStats.fixed_var.fillna(
             self.geneStats.fixed_var.min())
@@ -697,7 +719,7 @@ class Dataset:
                              (gene_stats['nzm'] < nzm_max_thresh) & \
                              (gene_stats['ncells'] > min_cells)
         else:
-            vmr = gene_stats['variance']/gene_stats['m']
+            vmr = gene_stats['variance'] / gene_stats['m']
             hvg_candidates = (vmr > var_min_thresh) & \
                              (gene_stats['nzm'] > nzm_min_thresh) & \
                              (vmr < var_max_thresh) & \
@@ -717,7 +739,7 @@ class Dataset:
         h5.flush(), h5.close()
         print('%d highly variable genes found' % len(self.hvgList), flush=True)
 
-    def get_lvgs(self, nzm_cutoff: float= None, log_nzm_cutoff: float= None,
+    def get_lvgs(self, nzm_cutoff: float = None, log_nzm_cutoff: float = None,
                  n: int = None, use_corrected_var: bool = False) -> list:
         """
         Get name of names with least corrected variance.
@@ -749,7 +771,7 @@ class Dataset:
         if nzm_cutoff is not None:
             cutoff = nzm_cutoff
         else:
-            cutoff = np.e**log_nzm_cutoff
+            cutoff = np.e ** log_nzm_cutoff
         if n is None:
             n = len(self.hvgList)
         fv = self.geneStats[(self.geneStats['valid_gene']) &
@@ -914,7 +936,7 @@ class Dataset:
                 scaling_params, disable_tqdm=disable_tqdm,
                 tqdm_msg='Performing incremental PCA fit '):
             cache.append(list(a))
-            n +=1
+            n += 1
             if len(cache) == cur_cache_size:
                 self.ipca.partial_fit(cache)
                 cache = []
