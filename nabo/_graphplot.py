@@ -264,11 +264,12 @@ class GraphPlot:
                 try:
                     attr = self.graph.nodes[i][self.vertexColorAttr]
                 except KeyError:
-                    # Missing value will be given default vertex colour in the
-                    # _plot_nodes() method
-                    pass
+                    self.vertexColor[i] = self.vertexColorDefault
                 else:
-                    self.vertexColor[i] = attr
+                    if attr is None or attr == '':
+                        self.vertexColor[i] = self.vertexColorDefault
+                    else:
+                        self.vertexColor[i] = attr
             if len(self.vertexColor) > 0:
                 uniq_vals = natsorted(set(self.vertexColor.values()))
                 if all(isinstance(x, str) for x in uniq_vals):
