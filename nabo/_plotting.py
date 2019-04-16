@@ -2,9 +2,10 @@ import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d # Needed for 3D UMAPS
 import seaborn as sns
 import numpy as np
-from typing import Dict
+from typing import Dict, List
 plt.style.use('fivethirtyeight')
 from natsort import natsorted, ns
+import pandas as pd
 
 __all__ = ['plot_summary_data', 'plot_mean_var', 'plot_scree',
            'plot_cluster_scores', 'plot_target_class_counts',
@@ -120,33 +121,186 @@ def plot_scree(pca, var_target, plot_comps):
     plt.show()
 
 
-def plot_cluster_scores(scores: Dict[str, str]) -> None:
-    fig, ax = plt.subplots(1, 1, figsize=(5, 3))
-    labels = natsorted(scores.keys(), alg=ns.IGNORECASE)
-    pos = list(range(len(labels)))
-    ax.boxplot([scores[x] for x in labels], positions=pos, sym='')
-    ax.set_xticks(pos)
-    ax.set_xticklabels(labels)
-    ax.set_ylabel('Mapping score', fontsize=13)
-    ax.set_xlabel('Cluster label', fontsize=13)
-    clean_axis(ax)
+def plot_cluster_scores(values: Dict, clusters: Dict, sort: bool = False,
+                        order: List = None, show_outliers: bool = False,
+                        vertical: bool = False, fig_size: tuple = None,
+                        x_ticks: List = None, x_lim: tuple = None,
+                        tick_fs: int = 10, label_fs: int = 12,
+                        tlabel_rotation: int = 0, cmap: str = 'hls',
+                        save_name: str = None, display: bool = True) -> None:
+    """
+
+    :param values:
+    :param clusters:
+    :param sort:
+    :param order:
+    :param show_outliers:
+    :param vertical:
+    :param fig_size:
+    :param x_ticks:
+    :param x_lim:
+    :param tick_fs:
+    :param label_fs:
+    :param tlabel_rotation:
+    :param cmap:
+    :param save_name:
+    :param display:
+    :return:
+    """
+    scores = pd.DataFrame([pd.Series(values, name='values'),
+                           pd.Series(clusters, name='clusters')]).T
+    if order is None:
+        order = np.array(natsorted(scores.clusters.unique()))
+    scores = scores.groupby('clusters')
+    values = np.array([scores.get_group(x)['values'].values for x in order])
+    idx = None
+    if sort is True:
+        idx = np.argsort([np.mean(x) for x in values])
+        order = order[idx]
+        values = values[idx]
+    if vertical == sort:
+        order = order[::-1]
+        values = values[::-1]
+        if idx is not None:
+            idx = idx[::-1]
+        elif vertical is False:
+            idx = list(range(len(values)))[::-1]
+
+    if fig_size is None:
+        if vertical is False:
+            fig_size = (4, len(values) / 4)
+        else:
+            fig_size = (len(values) / 4, 4)
+    fig, ax = plt.subplots(1, 1, figsize=fig_size)
+
+    if show_outliers:
+        sym = '+'
+    else:
+        sym = ''
+    bp = ax.boxplot(values, sym=sym, patch_artist=True, vert=vertical)
+    colors = np.array(sns.color_palette(cmap, len(values)))
+    if idx is not None:
+        colors = colors[idx]
+    for i, j in zip(bp['boxes'], colors):
+        i.set_facecolor(j)
+    plt.setp(bp['medians'], color='k')
+    if vertical is True:
+        ax.set_ylabel('Mapping score', fontsize=label_fs)
+        ax.set_xticklabels(order, rotation=tlabel_rotation, ha='center',
+                           va='center')
+    else:
+        ax.set_xlabel('Mapping score', fontsize=label_fs)
+        ax.set_yticklabels(order, rotation=tlabel_rotation, ha='center',
+                           va='center')
+    if x_ticks is not None:
+        ax.set_xticks(x_ticks)
+    if x_lim is not None:
+        ax.set_xlim(x_lim)
+    clean_axis(ax, ts=tick_fs)
     plt.tight_layout()
-    plt.show()
+    if save_name is not None:
+        plt.savefig(save_name, dpi=300)
+    if display:
+        plt.show()
+    else:
+        plt.close()
 
 
-def plot_target_class_counts(counts: Dict[str, str], na_label: str = "NA"):
-    labels = natsorted([x for x in counts if x != na_label],
-                       alg=ns.IGNORECASE) + [na_label]
-    pos = list(range(len(labels)))
-    fig, ax = plt.subplots(1, 1, figsize=(5, 3))
-    ax.bar(pos, [counts[x] for x in labels], color='darkgrey', alpha=0.9)
-    ax.set_xticks(pos)
-    ax.set_xticklabels(labels)
-    ax.set_xlabel('Cluster label', fontsize=13)
-    ax.set_ylabel('# target cells', fontsize=13)
-    clean_axis(ax)
+def plot_target_class_counts(values: Dict, ref_values: Dict,
+                             vertical: bool = False, dropna: bool = False,
+                             sort: bool = True, percent: bool = True,
+                             enrichment: bool = False, order: bool = None,
+                             line_kw: Dict = None, na_label: str = 'NA',
+                             cmap: str ='hls', fig_size: tuple = None,
+                             tick_fs: int = 10, label_fs: int = 12,
+                             tlabel_rotation: int = 0, save_name: str = None,
+                             display: bool = True) -> None:
+    """
+
+    :param values:
+    :param ref_values:
+    :param vertical:
+    :param dropna:
+    :param sort:
+    :param percent:
+    :param enrichment:
+    :param order:
+    :param line_kw:
+    :param na_label:
+    :param cmap:
+    :param fig_size:
+    :param tick_fs:
+    :param label_fs:
+    :param tlabel_rotation:
+    :param save_name:
+    :param display:
+    :return:
+    """
+    values = pd.Series(values).value_counts()
+    ref_values = pd.Series(ref_values).value_counts()
+
+    for i in set(ref_values.index).difference(values.index):
+        values[i] = 0
+    if dropna is True:
+        values = values.drop(na_label, errors='ignore')
+    label = '#cells in cluster'
+    if enrichment is True:
+        values = (values / values.sum()) / (ref_values / ref_values.sum())
+        values.fillna(0, inplace=True)
+        label = 'Relative enrichment'
+    elif percent is True:
+        values = values / values.sum()
+        label = '%cells in cluster'
+
+    if order is None:
+        order = np.array(natsorted(values.index))
+    values = np.array([values[x] for x in order])
+    colors = np.array(sns.color_palette(cmap, len(values)))
+
+    if sort is True:
+        idx = np.argsort(values)[::-1]
+    else:
+        idx = list(range(len(values)))
+    if vertical is False:
+        idx = idx[::-1]
+    values = values[idx]
+    colors = colors[idx]
+    order = order[idx]
+
+    if fig_size is None:
+        if vertical:
+            fig_size = (5, 3)
+        else:
+            fig_size = (3, 5)
+    fig, ax = plt.subplots(1, 1, figsize=fig_size)
+    if vertical is True:
+        ax.bar(range(len(order)), values, color=colors)
+        ax.set_xticks(range(len(order)))
+        ax.set_xticklabels(order, rotation=tlabel_rotation, ha='center',
+                           va='center')
+        ax.set_ylabel(label, fontsize=label_fs)
+    else:
+        ax.barh(range(len(order)), values, color=colors)
+        ax.set_yticks(range(len(order)))
+        ax.set_yticklabels(order, rotation=tlabel_rotation, ha='center',
+                           va='center')
+        ax.set_xlabel(label, fontsize=label_fs)
+
+    if enrichment is True:
+        if line_kw is None:
+            line_kw = {'lw': 1, 'ls': '--', 'color': 'k'}
+        if vertical:
+            ax.axhline(1, **line_kw)
+        else:
+            ax.axvline(1, **line_kw)
+    clean_axis(ax, ts=tick_fs)
     plt.tight_layout()
-    plt.show()
+    if save_name is not None:
+        plt.savefig(save_name, dpi=300)
+    if display:
+        plt.show()
+    else:
+        plt.close()
 
 
 def plot_box_exp(dataset, gene, groups, group_names,
