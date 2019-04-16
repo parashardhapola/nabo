@@ -237,6 +237,37 @@ class Graph(nx.Graph):
                 self.nodes[node]['cluster'] = str(clust_num)
         return None
 
+    def get_cluster_identity_weights(self) -> pd.Series:
+        """
+
+        :return: Cluster identity weights for each cell
+        """
+        ciw = {}
+        clusters = self.clusters
+        if clusters == {}:
+            raise ValueError("ERROR: Please make sure that clusters have "
+                             "been assigned to cells. Run 'make_clusters' or "
+                             "import clusters")
+        skipped_cells = 0
+        for i in tqdm(self.refG, total=len(self.refG)):
+            cw = []
+            for j in self.refG.edges(i, data=True):
+                try:
+                    cw.append((clusters[j[1]], j[2]['weight']))
+                except KeyError:
+                    skipped_cells += 1
+                    continue
+            if len(cw) > 0:
+                cw = pd.DataFrame(cw)
+                cw = cw.groupby(0).size() * \
+                     cw.groupby(0).sum()[1].sort_values().values
+                ciw[i] = cw[-1] - cw[:-1].sum()
+            else:
+                skipped_cells += 1
+        if skipped_cells > 0:
+            print ("WARNING: %d cells were skipped" % skipped_cells)
+        return pd.Series(ciw)
+
     def import_clusters(self, cluster_dict: Dict[str, str] = None,
                         missing_val: str = 'NA') -> None:
         """
@@ -270,8 +301,8 @@ class Graph(nx.Graph):
         return self.import_clusters(json.load(open(fn)))
 
     def import_clusters_from_csv(self, csv: str, csv_sep: str = ',',
-                                 cluster_col: int = 0,
-                                 append_ref_name: bool = True):
+                                 cluster_col: int = 0, header = None,
+                                 append_ref_name: bool = False):
         """
         :param csv: Filename containing cluster information. Make
                     sure that the first column contains cell names and
@@ -283,7 +314,7 @@ class Graph(nx.Graph):
                                 Default: True)
         :return: None
         """
-        df = pd.read_csv(csv, index_col=0, sep=csv_sep, header=None)
+        df = pd.read_csv(csv, index_col=0, sep=csv_sep, header=header)
         cluster_dict = df[df.columns[cluster_col]].to_dict()
         if append_ref_name:
             cluster_dict = {k + '_' + self.refName: v for
@@ -388,6 +419,7 @@ class Graph(nx.Graph):
         return self.import_layout(json.load(open(fn)))
 
     def import_layout_from_csv(self, csv: str, csv_sep: str = ',',
+                               dim_cols: tuple = (0, 1), header = None,
                                append_ref_name: bool = False):
         """
         Import graph layout coordinates from a CSV file
@@ -400,12 +432,14 @@ class Graph(nx.Graph):
                                 Default: True)
         :return: None
         """
-        layout = pd.read_csv(csv, index_col=0, sep=csv_sep, header=None)
+        layout = pd.read_csv(csv, index_col=0, sep=csv_sep, header=header)
+        d1 = layout.columns[dim_cols[0]]
+        d2 = layout.columns[dim_cols[1]]
         if append_ref_name:
-            layout = {x + '_' + self.refName: (layout[1][x], layout[2][x])
+            layout = {x + '_' + self.refName: (layout[d1][x], layout[d2][x])
                       for x in layout.index}
         else:
-            layout = {x: (layout[1][x], layout[2][x]) for x in layout.index}
+            layout = {x: (layout[d1][x], layout[d2][x]) for x in layout.index}
         return self.import_layout(layout)
 
     @property
