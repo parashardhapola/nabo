@@ -285,7 +285,8 @@ class Dataset:
         return sorted(set(genes))
 
     def export_as_dataframe(self, genes: List[str], normalized: bool = True,
-                            clr_normed: bool = False) -> pd.DataFrame:
+                            clr_normed: bool = False,
+                            clr_axis: int = 0) -> pd.DataFrame:
         """
         Export data for given genes. Data is exported only for cells
         that are present in keepCellsIdx attribute.
@@ -310,11 +311,13 @@ class Dataset:
             values.append(a[self.keepCellsIdx])
             saved_genes.append(gene)
         h5.close()
-        if clr_normed:
-            values = np.array(values)
-        return pd.DataFrame(
+        df = pd.DataFrame(
             values, index=saved_genes,
             columns=[self.cells[x] for x in self.keepCellsIdx]).T
+        if clr_normed:
+            return df.apply(clr, axis=clr_axis)
+        else:
+            return df
 
     def get_cell_lib(self, hto_patterns: List[str],
                      min_ratio: float = 0.5) -> pd.Series:
