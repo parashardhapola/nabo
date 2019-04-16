@@ -19,6 +19,18 @@ plt.style.use('fivethirtyeight')
 __all__ = ['GraphPlot']
 
 
+def list_order(a, b):
+    c = {x: None for x in set(a).intersection(b)}
+    new_a = []
+    for i in b:
+        if i in c:
+            new_a.append(i)
+    for i in a:
+        if i not in c:
+            new_a.append(i)
+    return new_a
+
+
 class GraphPlot:
     """
     Class for customized Graph drawing
@@ -86,16 +98,16 @@ class GraphPlot:
     """
 
     def __init__(self, g: Graph, only_ref=True, vc='steelblue', cmap=None,
-                 vc_attr=None, vc_default='grey',
+                 vc_attr=None, vc_default='grey', vec=None,
                  vc_min=None, vc_max=None, vc_percent_trim=None,
                  max_ncolors=40,
                  vs=2, vs_scale=15,
                  vs_min=None, vs_max=None, vs_percent_trim=0,
-                 vlw=0, v_alpha=0.6,
+                 vlw=0, v_alpha=0.6, v_zorder=None,
                  draw_edges: str = 'all', ec='k', elw=0.1, e_alpha=0.1,
                  bundle_edges: bool = False, bundle_bw: float = 0.1,
                  bundle_decay: float = 0.7,
-                 bundle_min_edge_weight: float = 0,
+                 edge_min_weight: float = 0,
                  texts=None, texts_fs=20,
                  title=None, title_fs=30,
                  label_attr=None, label_attr_type='centroid',
@@ -107,6 +119,7 @@ class GraphPlot:
             texts = []
         self.graph = g
         self.vertexColor = vc
+        self.vertexEdgeColor = vec
         self.colormap = cmap
         self.vertexColorAttr = vc_attr
         self.vertexColorDefault = vc_default
@@ -125,10 +138,10 @@ class GraphPlot:
         self.edgeColors = ec
         self.edgeLineWidth = elw
         self.edgeAlpha = e_alpha
+        self.edgeMinWeight = edge_min_weight
         self.bundleEdges = bundle_edges
         self.bundleBw = bundle_bw
         self.bundleDecay = bundle_decay
-        self.bundleMinEdgeWeight = bundle_min_edge_weight
         self.texts = texts
         self.textFontSize = texts_fs
         self.title = title
@@ -165,6 +178,10 @@ class GraphPlot:
         if len(keep_nodes) == 0:
             raise ValueError("ERROR: None of the nodes in the graph has "
                              "'pos' attribute")
+        if v_zorder is not None:
+            keep_nodes = list_order(keep_nodes, v_zorder)
+            # inverse because first will be plotted first
+            keep_nodes = keep_nodes[::-1]
         self.positions = {x: self.graph.nodes[x]['pos'] for x in keep_nodes}
         self._set_vertex_color()
         self._set_vertex_size()
@@ -189,7 +206,7 @@ class GraphPlot:
                 columns=['id', 'x', 'y'])
             e = pd.DataFrame(
                 [[node_name_map[y] for y in x[:2]] for x in
-                 edges if x[2]['weight'] > self.bundleMinEdgeWeight
+                 edges if x[2]['weight'] > self.edgeMinWeight
                  and x[0] in node_name_map and x[1] in node_name_map
                  ],
                 columns=['source', 'target'])
@@ -205,17 +222,25 @@ class GraphPlot:
                 edges = make_bundles(self.graph.nodes,
                                      self.graph.edges(data=True))
             else:
-                edges = np.array([(self.positions[x[0]], self.positions[x[1]])
-                                  for x in self.graph.edges if x[0] in
-                                  self.positions and x[1] in self.positions])
+                edges = np.array([
+                    (self.positions[x[0]], self.positions[x[1]])
+                        for x in self.graph.edges(data=True)
+                            if x[0] in self.positions and
+                               x[1] in self.positions and
+                               x[2]['weight'] > self.edgeMinWeight
+                ])
         elif self.drawEdges is 'ref':
             if self.bundleEdges and hammer_bundle is not None:
                 edges = make_bundles(self.graph.refNodes,
                                      self.graph.refG.edges(data=True))
             else:
-                edges = np.array([(self.positions[x[0]], self.positions[x[1]])
-                                  for x in self.graph.refG.edges if x[0] in
-                                  self.positions and x[1] in self.positions])
+                edges = np.array([
+                    (self.positions[x[0]], self.positions[x[1]])
+                    for x in self.graph.refG.edges(data=True)
+                    if x[0] in self.positions and
+                       x[1] in self.positions and
+                       x[2]['weight'] > self.edgeMinWeight
+                ])
         elif self.drawEdges in self.graph.targetNames:
             if self.bundleEdges and hammer_bundle is not None:
                 edges = make_bundles(
@@ -264,10 +289,12 @@ class GraphPlot:
                 try:
                     attr = self.graph.nodes[i][self.vertexColorAttr]
                 except KeyError:
-                    self.vertexColor[i] = self.vertexColorDefault
+                    # Missing value will be given default vertex colour in the
+                    # _plot_nodes() method
+                    pass
                 else:
-                    if attr is None or attr == '':
-                        self.vertexColor[i] = self.vertexColorDefault
+                    if attr == '' or attr is None:
+                        pass
                     else:
                         self.vertexColor[i] = attr
             if len(self.vertexColor) > 0:
@@ -412,6 +439,7 @@ class GraphPlot:
         pos = np.array(pos).T
         self.ax.scatter(pos[0], pos[1], s=sizes, c=np.array(colours),
                         lw=self.vertexLineWidth,
+                        edgecolors=self.vertexEdgeColor,
                         zorder=2, alpha=self.vertexAlpha)
 
     def _place_attr_label(self):
