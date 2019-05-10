@@ -1,10 +1,12 @@
 import h5py
-from typing import List
+from typing import List, Dict
 import os
 import numba
 import numpy as np
 import networkx as nx
 from tqdm import tqdm
+import random
+import string
 
 __all__ = ['Mapping']
 
@@ -273,6 +275,10 @@ def _dump_graph(g: nx.Graph, fn: str, out_grp: str) -> None:
     return None
 
 
+def random_string(n: int = 30) -> str:
+    return ''.join(random.choice(string.ascii_lowercase) for _ in range(n))
+
+
 class Mapping:
     """
     This class encapsulates functions required to perform cell mapping.
@@ -286,33 +292,38 @@ class Mapping:
                        by Nabo's Dataset class.
     :param ref_pca_grp_name: Name of the group in the inout HDF5 file
                              wherein the data exists
+    :param overwrite: Deletes all the data saved in the mapping_h5_fn to
+                      start from scratch (default: False)
     """
     def __init__(self, mapping_h5_fn: str, ref_name: str, ref_pca_fn: str,
-                 ref_pca_grp_name: str):
-        if mapping_h5_fn == ref_pca_fn:
-            raise ValueError(
-                "ERROR: Input HDF5 and output HDF5 file cannot be same")
-        if ref_name.isalpha() is False:
-            raise ValueError(
-                "ERROR: Reference name should contain only alphabets")
-        self.refName: str = ref_name
+                 ref_pca_grp_name: str, overwrite: bool = False):
+
         self._h5Fn: str = mapping_h5_fn
+        self.refName: str = ref_name
         self._refPcaFn: str = ref_pca_fn
         self._refPcaGrp: str = ref_pca_grp_name
-        self._refDistGrp: str = self.refName + '_dist'
-        self._refSortedDistGrp: str = self.refName + '_sortedDist'
-        self._refGraphGrpName = self.refName + '_graph'
+        if self._h5Fn == self._refPcaFn:
+            raise ValueError(
+                "ERROR: Input HDF5 and output HDF5 file cannot be same")
+        self._check_h5(self._refPcaFn, self._refPcaGrp)
+        self.refCells: List[str] = []
+        self._nameStash: Dict[str, str] = {}
+        self._check_preload(overwrite)
+
+        self._refDistGrp: str = self._nameStash[self.refName] + '_dist'
+        self._refSortedDistGrp: str = \
+            self._nameStash[self.refName] + '_sortedDist'
+        self._refGraphGrpName = self._nameStash[self.refName] + '_graph'
         self._useComps = None
         self._k = None
         self._distFactor = None
         self._chunkSize = None
-        self._check_h5(self._refPcaFn, self._refPcaGrp)
-        self.refCells: List[str] = self._load_ref_cells()
 
     @staticmethod
     def _check_h5(fn: str, group: str) -> bool:
         """
-        Verifies that input HDF5 file and group exist
+        Verifies that HDF5 file and group exist
+
         :param fn: Name of file
         :param group: Name of group
         :return: True if filename and group exist
@@ -326,6 +337,60 @@ class Mapping:
         h5.close()
         return True
 
+    def _create_metadata(self, h5):
+        keys = list(h5.keys())
+        for i in keys:
+            del h5[i]
+
+        grp = h5.create_group('name_stash')
+        rs = random_string(30)
+        self._nameStash[self.refName] = rs
+        grp.create_dataset('ref_name', data=[
+            self.refName.encode('ascii'), rs.encode('ascii')])
+
+        self.refCells = self._load_ref_cells()
+        grp = h5.create_group('ref_cells')
+        grp.create_dataset(
+            'ref_cells', data=[x.encode('ascii') for x in self.refCells])
+        return True
+
+    def _check_preload(self, overwrite: bool):
+        h5 = h5py.File(self._h5Fn, mode='a')
+        if overwrite is True:
+            self._create_metadata(h5)
+        else:
+            if 'ref_cells' in h5 and 'ref_cells' in h5['ref_cells'] and \
+               'name_stash' in h5 and 'ref_name' in h5['name_stash']:
+
+                ref_name = h5['name_stash/ref_name'][0].decode('UTF-8')
+                if ref_name != self.refName:
+                    raise ValueError(
+                        "ERROR: A different ref_name was used before for "
+                        "this mapping file. Please set overwrite=True if "
+                        "you want to overwrite all the saved data.")
+                else:
+                    if 'target_names' in h5['name_stash']:
+                        for i in h5['name_stash/target_names']:
+                            self._nameStash[i[0].decode('UTF-8')] = \
+                                i[1].decode('UTF-8')
+                    self._nameStash[self.refName] = \
+                        h5['name_stash/ref_name'][1].decode('UTF-8')
+                saved_cells = [x.decode('UTF-8') for x in
+                               h5['ref_cells/ref_cells'][:]]
+                pca_cells = self._load_ref_cells()
+                intersect = set(saved_cells).intersection(pca_cells)
+                if len(saved_cells) == len(pca_cells) == len(intersect):
+                    self.refCells = saved_cells
+                else:
+                    raise ValueError(
+                        "ERROR: Cell names in PCA file does not match those "
+                        "used before in this mapping file. Please set "
+                        "overwrite=True if you want to overwrite all the "
+                        "saved data.")
+            else:
+                self._create_metadata(h5)
+        h5.close()
+
     def _load_ref_cells(self) -> List[str]:
         """
         Loads names of cells from input HDF5 file saves them into
@@ -334,19 +399,11 @@ class Mapping:
 
         :return: List containing cell names
         """
-        h5 = h5py.File(self._h5Fn, mode='a')
-        if 'ref_cells' in h5 and 'ref_cells' in h5['ref_cells']:
-            ref_cells = [x.decode('UTF-8') for x in
-                         h5['ref_cells/ref_cells'][:]]
-        else:
-            pca_h5 = h5py.File(self._refPcaFn, mode='r')
-            ref_cells = [x for x in pca_h5[self._refPcaGrp]]
-            pca_h5.close()
-            grp = h5.create_group('ref_cells')
-            grp.create_dataset(
-                'ref_cells', data=[x.encode('ascii') for x in ref_cells])
-        h5.close()
-        return sorted(ref_cells)
+
+        pca_h5 = h5py.File(self._refPcaFn, mode='r')
+        ref_cells = [x for x in pca_h5[self._refPcaGrp]]
+        pca_h5.close()
+        return ref_cells
 
     def calc_dist(self, target_fn: str, target_grp: str, dist_grp: str,
                   sorted_dist_grp: str, ignore_ref_cells: List[str]) -> None:
@@ -412,8 +469,9 @@ class Mapping:
             msg = 'Constructing reference graph   '
         else:
             msg = 'Constructing target graph      '
-        g = _calc_snn(self._h5Fn, target_sorted_dist_grp, target_name,
-                      self._refSortedDistGrp, self.refName,
+        g = _calc_snn(self._h5Fn, target_sorted_dist_grp,
+                      self._nameStash[target_name],
+                      self._refSortedDistGrp, self._nameStash[self.refName],
                       self.refCells, self._k, msg)
         if target_name == self.refName:
             if nx.is_connected(g) is False:
@@ -482,10 +540,25 @@ class Mapping:
         self.calc_snn(self._refSortedDistGrp, self.refName,
                       self._refGraphGrpName)
 
+    def _stash_target_name(self, target: str):
+        h5 = h5py.File(self._h5Fn, mode='a')
+        if 'target_names' in h5['name_stash']:
+            del h5['name_stash/target_names']
+        self._nameStash[target] = random_string(30)
+        stash_data = []
+        for i in self._nameStash:
+            if i != self.refName:
+                stash_data.append(
+                    [i.encode('ascii'), self._nameStash[i].encode('ascii')]
+                )
+        h5['name_stash'].create_dataset('target_names', data=stash_data)
+        h5.close()
+
     def map_target(self, target_name: str, target_pca_fn: str,
                    target_pca_grp_name: str,
                    ignore_ref_cells: List[str] = None,
-                   use_stored_distances: bool = False) -> None:
+                   use_stored_distances: bool = False,
+                   overwrite: bool = False) -> None:
         """
         A wrapper to run calc_dist and calc_snn function for mapping target
         cells onto reference graph. If same target name is provided twice
@@ -499,21 +572,12 @@ class Mapping:
         :param ignore_ref_cells: List of reference cell names to be excluded
                                  from mapping
         :param use_stored_distances: If True then distance between target and
-                                      reference cells is not calculated and
-                                      Nabo will try to use the stored
-                                      distance matrix. (Default: False)
+                                     reference cells is not calculated and
+                                     Nabo will try to use the stored
+                                     distance matrix. (Default: False)
+        :param overwrite: Overwrite the target data
         :return: None
         """
-        if target_name.isalpha() is False:
-            raise ValueError(
-                "ERROR: Reference name should contain only alphabets")
-        if target_name == self.refName:
-            raise ValueError('ERROR: Target name cannot be same as reference '
-                             'name. Please provide a different name.')
-        if use_stored_distances is True:
-            self.calc_snn(target_name + '_sortedDist', target_name,
-                          target_name + '_graph')
-            return None
         if target_pca_fn == self._refPcaFn:
             if target_pca_grp_name == self._refPcaGrp:
                 raise ValueError(
@@ -522,12 +586,34 @@ class Mapping:
         if target_pca_fn == self._h5Fn:
             raise ValueError(
                 "ERROR: Input HDF5 and output HDF5 file cannot be same")
+        if target_name == self.refName:
+            raise ValueError('ERROR: Target name cannot be same as reference '
+                             'name. Please provide a different name.')
         if ignore_ref_cells is None:
             ignore_ref_cells = []
+        if use_stored_distances is True:
+            if target_name not in self._nameStash:
+                print("WARNING: Target data not saved. use_stored_distances "
+                      "will have no effect")
+            else:
+                if overwrite is True:
+                    print("WARNING: overwrite has no effect as "
+                          "use_stored_distances is set to True")
+                self.calc_snn(
+                    self._nameStash[target_name] + '_sortedDist',
+                    target_name, self._nameStash[target_name] + '_graph')
+                return None
+        else:
+            if overwrite is False and target_name in self._nameStash:
+                raise ValueError(
+                    "ERROR: Data with this target name exists. Please set "
+                    "overwrite=True if you want to map this target again.")
+        self._stash_target_name(target_name)
         self._check_h5(target_pca_fn, target_pca_grp_name)
         self.calc_dist(target_pca_fn, target_pca_grp_name,
-                       target_name+'_dist', target_name+'_sortedDist',
+                       self._nameStash[target_name]+'_dist',
+                       self._nameStash[target_name]+'_sortedDist',
                        ignore_ref_cells)
-        self.calc_snn(target_name + '_sortedDist', target_name,
-                      target_name + '_graph')
+        self.calc_snn(self._nameStash[target_name] + '_sortedDist',
+                      target_name, self._nameStash[target_name] + '_graph')
         return None
