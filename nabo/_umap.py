@@ -5,8 +5,8 @@ import h5py
 __all__ = ['make_umap']
 
 
-def make_umap(pca_h5: str, use_comps: int,
-              umap_dims: int, n_neighbors: int, spread: float,
+def make_umap(pca_h5: str, use_comps: int, umap_dims: int, n_neighbors: int,
+              spread: float, repulsion_strength: float,
               min_dist: float, n_epochs: int, data_group: str = 'data',
               index_suffix: str = '', verbose: bool = True) -> pd.DataFrame:
     """
@@ -17,6 +17,7 @@ def make_umap(pca_h5: str, use_comps: int,
     :param umap_dims: Number of UMAP dimensions to create
     :param n_neighbors: n_neighbours
     :param spread: spread
+    :param repulsion_strength: repulsion_strength
     :param min_dist: min_dist
     :param n_epochs: n_epochs
     :param verbose: verbose
@@ -29,8 +30,8 @@ def make_umap(pca_h5: str, use_comps: int,
         {x: h5data['data'][x][:use_comps] for x in h5data[data_group]}).T
     h5data.close()
 
-    um = umap.UMAP(n_neighbors=n_neighbors,
-                   n_components=umap_dims, n_epochs=n_epochs,
+    um = umap.UMAP(n_neighbors=n_neighbors, n_components=umap_dims,
+                   repulsion_strength=repulsion_strength, n_epochs=n_epochs,
                    spread=spread, min_dist=min_dist, verbose=verbose)
     return pd.DataFrame(um.fit_transform(df).T,
                         index=['Dim'+str(x) for x in range(1, umap_dims+1)],
