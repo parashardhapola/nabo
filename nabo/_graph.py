@@ -249,6 +249,7 @@ class Graph(nx.Graph):
                              "been assigned to cells. Run 'make_clusters' or "
                              "import clusters")
         skipped_cells = 0
+        max_nodes = []
         for i in tqdm(self.refG, total=len(self.refG)):
             cw = []
             for j in self.refG.edges(i, data=True):
@@ -261,12 +262,20 @@ class Graph(nx.Graph):
                 cw = pd.DataFrame(cw)
                 cw = cw.groupby(0).size() * \
                      cw.groupby(0).sum()[1].sort_values().values
-                ciw[i] = cw[-1] - cw[:-1].sum()
+                if len(cw) > 1:
+                    ciw[i] = cw[-1] / cw[:-1].sum()
+                else:
+                    ciw[i] = cw[-1]
+                    max_nodes.append(i)
             else:
                 skipped_cells += 1
         if skipped_cells > 0:
-            print ("WARNING: %d cells were skipped" % skipped_cells)
-        return pd.Series(ciw)
+            print("WARNING: %d cells were skipped" % skipped_cells)
+        ciw = pd.Series(ciw)
+        if len(max_nodes) > 0:
+            for i in max_nodes:
+                ciw[i] = ciw.max()
+        return ciw
 
     def import_clusters(self, cluster_dict: Dict[str, str] = None,
                         missing_val: str = 'NA') -> None:
