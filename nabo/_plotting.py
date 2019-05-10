@@ -249,7 +249,7 @@ def plot_target_class_counts(values: Dict, ref_values: Dict,
         values.fillna(0, inplace=True)
         label = 'Relative enrichment'
     elif percent is True:
-        values = values / values.sum()
+        values = 100*values / values.sum()
         label = '%cells in cluster'
 
     if order is None:
@@ -277,12 +277,12 @@ def plot_target_class_counts(values: Dict, ref_values: Dict,
         ax.bar(range(len(order)), values, color=colors)
         ax.set_xticks(range(len(order)))
         ax.set_xticklabels(order, rotation=tlabel_rotation, ha='center',
-                           va='center')
+                           va='top')
         ax.set_ylabel(label, fontsize=label_fs)
     else:
         ax.barh(range(len(order)), values, color=colors)
         ax.set_yticks(range(len(order)))
-        ax.set_yticklabels(order, rotation=tlabel_rotation, ha='center',
+        ax.set_yticklabels(order, rotation=tlabel_rotation, ha='right',
                            va='center')
         ax.set_xlabel(label, fontsize=label_fs)
 
