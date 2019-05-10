@@ -63,7 +63,34 @@ class Graph(nx.Graph):
             h5 = h5py.File(fn, mode='r')
         except (IOError, OSError):
             raise IOError('ERROR: Unable to open file %s' % fn)
-        grp = name + '_graph'
+        if kind == 'reference':
+            try:
+                saved_name = h5['name_stash/ref_name'][0].decode('UTF-8')
+                uid = h5['name_stash/ref_name'][1].decode('UTF-8')
+            except KeyError:
+                raise KeyError("ERROR: Could not find stashed names in the "
+                               "mapping file. Make sure reference graph has "
+                               "been created in the mapping file")
+            if name != saved_name:
+                raise KeyError("ERROR: The reference is named %s in the "
+                               "mapping file and not %s. Please verify that "
+                               "you are trying to load right reference." % (
+                                saved_name, name))
+        else:
+            try:
+                target_names = h5['name_stash/target_names'][:]
+            except KeyError:
+                raise KeyError("ERROR: Could not find stashed names in the "
+                               "mapping file. Make sure reference graph has "
+                               "been created in the mapping file")
+            uid = None
+            for i in target_names:
+                if i[0].decode('UTF-8') == name:
+                    uid = i[1].decode('UTF-8')
+            if uid is None:
+                raise KeyError("ERROR: The target name not could not be found "
+                               "in the mapping file")
+        grp = uid + '_graph'
         if grp not in h5:
             h5.close()
             raise KeyError('ERROR: Group %s not found in HDF5 file %s'
@@ -82,7 +109,6 @@ class Graph(nx.Graph):
                     node2 = j[0].decode('UTF-8')
                     weight = float(j[1].decode('UTF-8'))
                     self.add_edge(node, node2, weight=weight)
-
         h5.close()
         if kind == 'reference':
             self.refName = name
