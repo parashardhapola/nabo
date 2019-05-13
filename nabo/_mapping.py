@@ -230,7 +230,7 @@ def _fix_disconnected_graph(g: nx.Graph, ref_cells: List[str], fn: str,
             idx2 = sorted_lens_idx[j]
             if comp_lens[idx2] > comp_lens[idx1]:
                 valid_match_cell_idx[idx1].extend(
-                    [cells_map_idx[x.rsplit('_', 1)[0]] for x in
+                    [cells_map_idx[x.replace('_' + name, '')] for x in
                      comps[idx2]])
     for comp_n in valid_match_cell_idx:
         target_cells = {x: None for x in valid_match_cell_idx[comp_n]}
@@ -470,8 +470,8 @@ class Mapping:
         else:
             msg = 'Constructing target graph      '
         g = _calc_snn(self._h5Fn, target_sorted_dist_grp,
-                      self._nameStash[target_name],
-                      self._refSortedDistGrp, self._nameStash[self.refName],
+                      target_name,
+                      self._refSortedDistGrp, self.refName,
                       self.refCells, self._k, msg)
         if target_name == self.refName:
             if nx.is_connected(g) is False:
