@@ -4,7 +4,7 @@ Nabo - Cross population cell mapping using single cell RNA-Seq
 .. toctree::
     :maxdepth: 2
 
-    about
+    overview
     install
     examples
     faq
