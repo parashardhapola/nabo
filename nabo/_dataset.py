@@ -674,7 +674,8 @@ class Dataset:
             self, var_min_thresh: float = None, nzm_min_thresh: float = None,
             var_max_thresh: float = np.inf, nzm_max_thresh: float = np.inf,
             min_cells: int = 0, plot: bool = True,
-            use_corrected_var: bool = False) -> None:
+            use_corrected_var: bool = False,
+            update_cache: bool = False) -> None:
         """
         Identifies highly variable genes using cutoff provided for corrected
         variance and non-zero mean expression. Saves the result in attribute
@@ -694,6 +695,8 @@ class Dataset:
                      selected as HVGs in blue.
         :param use_corrected_var: if True then uses corrected variance
                                   variance (default: True)
+        :param update_cache: If true then Dump HVG list to the HDF5 (
+                             default: False)
         :return: None
         """
         if use_corrected_var is True and 'fixed_var' not in self.geneStats:
@@ -733,7 +736,8 @@ class Dataset:
                           nzm_min_thresh, var_max_thresh, nzm_max_thresh,
                           [self.geneBinsMin, self.varCorrectionFactor])
         self.hvgList = hvg_candidates[hvg_candidates].index
-        self.dump_hvgs(self.hvgList)
+        if update_cache:
+            self.dump_hvgs(self.hvgList)
         print('%d highly variable genes found' % len(self.hvgList), flush=True)
 
     def dump_hvgs(self, hvgs: List[str]) -> None:
