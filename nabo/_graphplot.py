@@ -41,7 +41,7 @@ class GraphPlot:
                a dictionary with node names as keys and values as
                matplotlib color strings/ floats / RGB  tuple. If floats
                then color will be selected on `colormap`. This parameter is
-               overridden by vc_attr
+               overridden by vc_attr:
     :param cmap: A valid matplotlib colour map
     :param vc_attr: Name of graph attribute to be used for colors.
                     Attribute values should either be floats or ints
@@ -158,12 +158,16 @@ class GraphPlot:
         self.removeAxes = remove_axes
         self.ax = ax
         self.verbose = verbose
+        self.fig = None
         self.removeWhenDone = True
+        self.scatterObj = None
+        self.finalSizes: list = None
+        self.finalColors: list = None
 
         if self.ax is None:
             if self.verbose is True:
                 print('Making a new axis')
-            _, self.ax = plt.subplots(1, 1, figsize=self.figSize)
+            self.fig, self.ax = plt.subplots(1, 1, figsize=self.figSize)
         else:
             self.removeWhenDone = False
 
@@ -224,10 +228,10 @@ class GraphPlot:
             else:
                 edges = np.array([
                     (self.positions[x[0]], self.positions[x[1]])
-                        for x in self.graph.edges(data=True)
-                            if x[0] in self.positions and
-                               x[1] in self.positions and
-                               x[2]['weight'] > self.edgeMinWeight
+                    for x in self.graph.edges(data=True)
+                    if x[0] in self.positions and
+                    x[1] in self.positions and
+                    x[2]['weight'] > self.edgeMinWeight
                 ])
         elif self.drawEdges is 'ref':
             if self.bundleEdges and hammer_bundle is not None:
@@ -238,8 +242,8 @@ class GraphPlot:
                     (self.positions[x[0]], self.positions[x[1]])
                     for x in self.graph.refG.edges(data=True)
                     if x[0] in self.positions and
-                       x[1] in self.positions and
-                       x[2]['weight'] > self.edgeMinWeight
+                    x[1] in self.positions and
+                    x[2]['weight'] > self.edgeMinWeight
                 ])
         elif self.drawEdges in self.graph.targetNames:
             if self.bundleEdges and hammer_bundle is not None:
@@ -437,10 +441,13 @@ class GraphPlot:
             else:
                 sizes.append(min_size * self.vertexSizeScale)
         pos = np.array(pos).T
-        self.ax.scatter(pos[0], pos[1], s=sizes, c=np.array(colours),
-                        lw=self.vertexLineWidth,
-                        edgecolors=self.vertexEdgeColor,
-                        zorder=2, alpha=self.vertexAlpha)
+        self.finalSizes = sizes
+        self.finalColors = colours
+        self.scatterObj = self.ax.scatter(
+            pos[0], pos[1], s=sizes, c=np.array(colours),
+            lw=self.vertexLineWidth, edgecolors=self.vertexEdgeColor,
+            zorder=2, alpha=self.vertexAlpha
+        )
 
     def _place_attr_label(self):
         if self.labelAttr is not None and self.labelAttrType == 'legend':
@@ -511,8 +518,8 @@ class GraphPlot:
             try:
                 plt.savefig(self.saveName, dpi=self.dpi, transparent=True)
             except (IOError, OSError):
-                print ('ERROR: Could not save image. Please check that path '
-                       'is correct and you have write permission')
+                print('ERROR: Could not save image. Please check that path '
+                      'is correct and you have write permission')
                 plt.show()
                 return None
         if self.showFig is True:
