@@ -126,7 +126,8 @@ def plot_cluster_scores(values: Dict, clusters: Dict, sort: bool = False,
                         vertical: bool = False, fig_size: tuple = None,
                         x_ticks: List = None, x_lim: tuple = None,
                         tick_fs: int = 10, label_fs: int = 12,
-                        tlabel_rotation: int = 0, cmap: str = 'hls',
+                        tlabel_rotation: int = 0, default_color: str = None,
+                        colors: Dict = None, cmap: str = 'hls',
                         save_name: str = None, display: bool = True) -> None:
     """
 
@@ -143,6 +144,7 @@ def plot_cluster_scores(values: Dict, clusters: Dict, sort: bool = False,
     :param label_fs:
     :param tlabel_rotation:
     :param cmap:
+    :param colors:
     :param save_name:
     :param display:
     :return:
@@ -178,9 +180,22 @@ def plot_cluster_scores(values: Dict, clusters: Dict, sort: bool = False,
     else:
         sym = ''
     bp = ax.boxplot(values, sym=sym, patch_artist=True, vert=vertical)
-    colors = np.array(sns.color_palette(cmap, len(values)))
-    if idx is not None:
-        colors = colors[idx]
+    if colors is None:
+        colors = np.array(sns.color_palette(cmap, len(values)))
+        if idx is not None:
+            colors = colors[idx]
+    else:
+        if default_color is None:
+            default_color = 'grey'
+        temp = []
+        for i in order:
+            if i not in colors:
+                print("WARNING: cluster %s is not present in "
+                      "color dict" % str(i))
+                temp.append(default_color)
+            else:
+                temp.append(colors[i])
+        colors = [x for x in temp]
     for i, j in zip(bp['boxes'], colors):
         i.set_facecolor(j)
     plt.setp(bp['medians'], color='k')
