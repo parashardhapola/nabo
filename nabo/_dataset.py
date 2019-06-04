@@ -733,14 +733,23 @@ class Dataset:
                           nzm_min_thresh, var_max_thresh, nzm_max_thresh,
                           [self.geneBinsMin, self.varCorrectionFactor])
         self.hvgList = hvg_candidates[hvg_candidates].index
+        self.dump_hvgs(self.hvgList)
+        print('%d highly variable genes found' % len(self.hvgList), flush=True)
+
+    def dump_hvgs(self, hvgs: List[str]) -> None:
+        """
+        Save HVGs to HDF5 file
+
+        :param hvgs: List of highly variable gens to save in the HDF5 file
+        :return:
+        """
         h5: h5py.File = h5py.File(self.h5Fn, mode='a', libver='latest')
         grp = h5['processed_data']
         if 'hvg_list' in grp:
             del grp['hvg_list']
         grp.create_dataset('hvg_list',
-                           data=[x.encode("ascii") for x in self.hvgList])
+                           data=[x.encode("ascii") for x in hvgs])
         h5.flush(), h5.close()
-        print('%d highly variable genes found' % len(self.hvgList), flush=True)
 
     def get_lvgs(self, nzm_cutoff: float = None, log_nzm_cutoff: float = None,
                  n: int = None, use_corrected_var: bool = False) -> list:
