@@ -24,7 +24,8 @@ def clean_axis(ax, ts=11, ga=0.4):
 
 
 def plot_summary_data(data, plot_names, color: str,
-                      display_stats: bool, savename: str):
+                      display_stats: bool, savename: str,
+                      showfig: bool = True) -> None:
     fig, axis = plt.subplots(1, len(plot_names), figsize=(13, 3))
     for i in range(len(plot_names)):
         val = np.array(data[i])
@@ -45,7 +46,10 @@ def plot_summary_data(data, plot_names, color: str,
     plt.tight_layout()
     if savename is not None:
         plt.savefig(savename, transparent=True, dpi=300)
-    plt.show()
+    if showfig:
+        plt.show()
+    else:
+        plt.close()
     return None
 
 

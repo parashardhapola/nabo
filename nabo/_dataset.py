@@ -487,7 +487,8 @@ class Dataset:
         return None
 
     def plot_raw(self, color: str = 'skyblue',
-                 display_stats: bool = True, savename: str = None) -> None:
+                 display_stats: bool = True,
+                 savename: str = None, showfig: bool = True) -> None:
         """
         Plot total expression, genes/cell, % mitochondrial expression and
         % ribosomal expression fro each cell from raw data
@@ -504,20 +505,25 @@ class Dataset:
                       '% mitochondrial genes', ' % ribosomal genes']
         plot_summary_data([tot_exp_per_cell, genes_per_cell,
                            percent_mito, percent_ribo], plot_names, color,
-                          display_stats, savename)
+                          display_stats, savename, showfig)
         print("The dataset contains: %d cells and %d genes"
               % (self.rawNCells, self.rawNGenes), flush=True)
         return None
 
     def plot_filtered(self, color: str = 'coral',
                       display_stats: bool = True,
-                      savename: str = None) -> None:
+                      savename: str = None, showfig: bool = True) -> None:
         """
         Plot total expression, genes/cell, % mitochondrial expression and
         % ribosomal expression for each cell from filtered data
 
+        :param color:
+        :param display_stats:
+        :param savename:
+        :param showfig:
         :return: None
         """
+
         tot_exp_per_cell = self.get_total_exp_per_cell()[self.keepCellsIdx]
         genes_per_cell = self.get_genes_per_cell()[self.keepCellsIdx]
         percent_mito = (100 * self.get_cum_exp(
@@ -528,7 +534,7 @@ class Dataset:
                       '% mitochondrial genes', ' % ribosomal genes']
         plot_summary_data([tot_exp_per_cell, genes_per_cell,
                            percent_mito, percent_ribo], plot_names, color,
-                          display_stats, savename)
+                          display_stats, savename, showfig)
         print("The dataset contains: %d cells and %d genes"
               % (len(self.keepCellsIdx), len(self.keepGenesIdx)), flush=True)
         return None
