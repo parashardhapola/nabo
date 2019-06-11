@@ -25,17 +25,28 @@ class ExpDict(dict):
     Class with attribute auto-complete feature. Will be useful
     """
 
+    def __init__(self, genes, exp_func, suffix):
+        super().__init__({x: None for x in genes})
+        self.genes = {x: None for x in genes}
+        self.expFunc = exp_func
+        self.suffix = suffix
+
     def __dir__(self):
-        return self.keys()
+        return self.genes
 
-    def __getattr__(self, key):
-        if key not in self:
+    def __getattr__(self, name):
+        if name in ['genes', 'expFunc', 'suffix']:
+            return self.__getattribute__(name)
+        else:
+            return self.__getitem__(name)
+
+    def __getitem__(self, key):
+        if key not in self.genes:
             raise KeyError('Invalid gene name')
-        return self['@@expfunc'](key, as_dict=True,
-                                 key_suffix=self['@@suffix'])
+        return self.expFunc(key, as_dict=True, key_suffix=self.suffix)
 
-    def __setattr__(self, key, value):
-        self[key] = value
+    def __repr__(self):
+        return "ExpDict for Dataset"
 
 
 class Dataset:
@@ -74,14 +85,8 @@ class Dataset:
         self.varCorrectionFactor = None
         self.hvgList = None
         self.ipca = None
-
         self._load_info()
-
-        self.exp = ExpDict()
-        for i in self.genes:
-            self.exp[i] = None
-        self.exp['@@suffix'] = ''
-        self.exp['@@expfunc'] = self.get_norm_exp
+        self.exp = ExpDict(self.genes, self.get_norm_exp, '')
 
     def _load_info(self):
         h5: h5py.File = h5py.File(self.h5Fn, mode='a', libver='latest')
@@ -139,9 +144,9 @@ class Dataset:
         :return:
         """
         if suffix == '':
-            self.exp['@@suffix'] = ''
+            self.exp.suffix = ''
         else:
-            self.exp['@@suffix'] = delimiter + suffix
+            self.exp.suffix = delimiter + suffix
         return None
 
     def _get_empty_gene_array(self) -> np.ndarray:
