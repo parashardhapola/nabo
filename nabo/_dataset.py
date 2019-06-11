@@ -973,7 +973,7 @@ class Dataset:
                     pass
         if len(cache) > 0:
             print('WARNING: Not all cells were processed! This is a bug. '
-                  'Please report to the authors.')
+                  'Please report it to the authors.')
             print('Debug info: %d %d' % (len(self.keepCellsIdx),
                                          len(cache)))
         self.ipca.genes = list(scaling_params.index)
@@ -990,7 +990,7 @@ class Dataset:
         :param pca_group_name: Name of HDF5 group wherein PCA transformed
                                values will be written. If the group exists
                                then it will be deleted
-        :param transformer: sklearn's incremental PCA instance ont which
+        :param transformer: sklearn's incremental PCA instance on which
                             fit function has already been called
         :param scaling_params: a DataFrame as return by `get_scaling_params`
                                method of reference sample
@@ -1001,7 +1001,7 @@ class Dataset:
                              value. (Default: False, raises error if gene name
                              not found). Using this parameter is not
                              recommended as of now because the implications
-                             of doing this has not been thoroughly tested.
+                             of doing this have not been thoroughly tested.
         :return: None
         """
         if transformer is None:
