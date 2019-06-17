@@ -211,9 +211,12 @@ class MtxToH5:
             grp.create_dataset(self.genes[i], shape=(self.FreqGenes[i],),
                                dtype=self.dType)
         gene_cache = {}
+        cell_keys = {x:None for x in self.h5['cell_data']}
         for i in tqdm(range(self.nCells + 1), bar_format=tqdm_bar,
                       desc='Saving gene-wise data          '):
             if i < self.nCells:
+                if self.cells[i] not in cell_keys:
+                    continue
                 d = self.h5['cell_data'][self.cells[i]][:]
                 for j in d:
                     gene = self.genes[j[0]]
