@@ -916,3 +916,56 @@ class CrToZarr:
                 for j in range(n_stores):
                     stores[j][p:n] = [x[j] for x in chunk]
                 chunk, p = [], n
+
+class SubSetZarr:
+    def __init__(self, in_fn, out_fn, cells):
+        self.iz = zarr.open(in_fn, mode='r')
+        self.oz = zarr.open(out_fn, mode='w')
+        self.cells, self.cellsIdx = self._get_cell_idx(cells)
+        self.nCells = len(self.cells)
+        self.nFeatures = {x: self.iz[x]['featureIds'].shape[0] for x in
+                          self.iz.group_keys()}
+        self._initialize_store((1000, 1000))
+
+    def _get_cell_idx(self, cells):
+        g = list(self.iz.group_keys())[0]
+        idx_map = {x: n for n, x in enumerate(self.iz['%s/cellNames' % g][:])}
+        valid_cells, idx = [], []
+        for i in cells:
+            if i in idx_map:
+                valid_cells.append(i)
+                idx.append(idx_map[i])
+        return valid_cells, idx
+
+    def _initialize_store(self, chunk_shape: Tuple[int, int]) -> None:
+        for assay in self.iz.group_keys():
+            g = self.oz.create_group(assay)
+            g.create_dataset('counts', chunks=chunk_shape, dtype='i4',
+                             shape=(self.nCells, self.nFeatures[assay]))
+            cell_dtype = 'U' + str(max([len(x) for x in self.cells]))
+            g.create_dataset('cellNames', data=self.cells, shape=self.nCells,
+                             dtype=cell_dtype)
+            for i in ['featureIds', 'featureNames']:
+                data = self.iz[assay + '/' + i][:]
+                g.create_dataset(i, data=data, shape=len(data),
+                                 dtype=data.dtype)
+
+    def _read_stream(self, chunk_size: int, show_progress: bool):
+        chunk_size = int(self.nCells / chunk_size) + 1
+        chunks = np.array_split(self.cellsIdx, chunk_size)
+        if show_progress:
+            for chunk in tqdm(chunks):
+                yield chunk
+        else:
+            for chunk in chunks:
+                yield chunk
+
+    def dump(self, chunk_size: int = 100, show_progress: bool = True) -> None:
+        for assay in self.iz.group_keys():
+            slot = '%s/counts' % assay
+            gos = self.iz[slot].get_orthogonal_selection
+            start, end = 0, 0
+            for chunk in self._read_stream(chunk_size, show_progress):
+                start = end
+                end = start + len(chunk)
+                self.oz[slot][start:end] = gos((chunk, slice(None)))
