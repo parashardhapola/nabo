@@ -674,6 +674,7 @@ def h5_to_mtx(fn, outdir, temp_suffix):
     with open('%s/barcodes.tsv' % temp_suffix, 'w') as h:
         h.write('\n'.join(data.cells))
 
+
 class FileReader:
     def __init__(self, fn: str, chunk_size: int = 10000,
                  by_line: bool = False):
@@ -717,6 +718,7 @@ class FileReader:
         return (
             f"FileReader:\n File: {self.fn}\n Compressed: {self._isCompressed}")
 
+
 class MtxReader(FileReader):
     def __init__(self, fn: str, n_features: int, chunk_size=int(1e4)):
         super().__init__(fn, chunk_size, by_line=False)
@@ -756,7 +758,7 @@ class CrReader(ABC):
         pass
 
     @abstractmethod
-    def _read_dataset(self, key: Optional[str] = None):
+    def _read_dataset(self, key: Optional[str] = None) -> List:
         pass
 
     @abstractmethod
@@ -916,6 +918,7 @@ class CrToZarr:
                 for j in range(n_stores):
                     stores[j][p:n] = [x[j] for x in chunk]
                 chunk, p = [], n
+
 
 class SubSetZarr:
     def __init__(self, in_fn, out_fn, cells):
