@@ -206,10 +206,10 @@ def plot_cluster_scores(values: Dict, clusters: Dict, sort: bool = False,
     if vertical is True:
         ax.set_ylabel('Mapping score', fontsize=label_fs)
         ax.set_xticklabels(order, rotation=tlabel_rotation, ha='center',
-                           va='center')
+                           va='top')
     else:
         ax.set_xlabel('Mapping score', fontsize=label_fs)
-        ax.set_yticklabels(order, rotation=tlabel_rotation, ha='center',
+        ax.set_yticklabels(order, rotation=tlabel_rotation, ha='right',
                            va='center')
     if x_ticks is not None:
         ax.set_xticks(x_ticks)
