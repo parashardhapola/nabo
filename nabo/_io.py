@@ -744,3 +744,135 @@ class MtxReader(FileReader):
         fh.close()
 
 
+class CrReader(ABC):
+    def __init__(self, grp_names):
+        self.grpNames: Dict = grp_names
+        self.nFeatures: int = len(self.featureNames())
+        self.nCells: int = len(self.cellNames())
+        self.assayFeats = self._make_feat_table()
+
+    @abstractmethod
+    def _handle_version(self):
+        pass
+
+    @abstractmethod
+    def _read_dataset(self, key: Optional[str] = None):
+        pass
+
+    @abstractmethod
+    def consume(self) -> Generator[List[np.ndarray], None, None]:
+        pass
+
+    def _subset_by_assay(self, v, assay) -> List:
+        if assay is None:
+            return v
+        elif assay not in self.assayFeats:
+            raise ValueError("ERROR: Assay ID %s is not valid" % assay)
+        l = self.assayFeats[assay]
+        return v[l.start: l.end]
+
+    def _make_feat_table(self) -> pd.DataFrame:
+        s = self.featureTypes()
+        span: List[Tuple] = []
+        last = s[0]
+        last_n: int = 0
+        for n, i in enumerate(s[1:], 1):
+            if i != last:
+                span.append((last, last_n, n))
+                last_n = n
+            elif n == len(s) - 1:
+                span.append((last, last_n, n + 1))
+            last = i
+        df = pd.DataFrame(span, columns=['type', 'start', 'end'])
+        df.index = ["assay%s" % str(x + 1) for x in df.index]
+        df['nFeatures'] = df.end - df.start
+        return df.T
+
+    def rename_assays(self, name_map: Dict[str, str]) -> None:
+        self.assayFeats.rename(columns=name_map, inplace=True)
+
+    def featureIds(self, assay: str = None) -> List[str]:
+        return self._subset_by_assay(self._read_dataset('featureIds'), assay)
+
+    def featureNames(self, assay: str = None) -> List[str]:
+        return self._subset_by_assay(self._read_dataset('featureNames'), assay)
+
+    def featureTypes(self) -> List[str]:
+        if self.grpNames['featureTypes'] is not None:
+            return self._read_dataset('featureTypes')
+        else:
+            return ['Gene Expression' for x in range(self.nFeatures)]
+
+    def cellNames(self, dummy_arg=None) -> List[str]:
+        return self._read_dataset('cellNames')
+
+
+class CrH5Reader(CrReader):
+    def __init__(self, h5_fn):
+        self.h5obj = h5py.File(h5_fn, mode='r')
+        self.grp = None
+        super().__init__(self._handle_version())
+
+    def _handle_version(self):
+        root_key = list(self.h5obj.keys())[0]
+        self.grp = self.h5obj[root_key]
+        if root_key == 'matrix':
+            grps = {'featureIds': 'features/id',
+                    'featureNames': 'features/name',
+                    'featureTypes': 'features/feature_type',
+                    'cellNames': 'barcodes'}
+        else:
+            grps = {'featureIds': 'genes', 'featureNames': 'gene_names',
+                    'featureTypes': None, 'cellNames': 'barcodes'}
+        return grps
+
+    def _read_dataset(self, key: Optional[str] = None):
+        return [x.decode('UTF-8') for x in self.grp[self.grpNames[key]][:]]
+
+    def consume(self) -> Generator[List[np.ndarray], None, None]:
+        idx = 0
+        split_idx = self.assayFeats.T.end.values
+        for n, i in enumerate(self.grp['indptr'][1:], 1):
+            g, v = self.grp['indices'][idx: i], self.grp['data'][idx: i]
+            idx = i
+            a = np.zeros(self.nFeatures, dtype=int)
+            a[g] = v
+            yield np.split(a, split_idx)[:-1]
+
+    def close(self) -> None:
+        self.h5obj.close()
+
+
+class CrDirReader(CrReader):
+    def __init__(self, loc):
+        self.loc: str = loc.rstrip('/') + '/'
+        self.matFn = None
+        super().__init__(self._handle_version())
+
+    def _handle_version(self):
+        if os.path.isfile(self.loc + 'features.tsv.gz'):
+            self.matFn = self.loc + 'matrix.mtx.gz'
+            grps = {'featureIds': ('features.tsv.gz', 0),
+                    'featureNames': ('features.tsv.gz', 1),
+                    'featureTypes': ('features.tsv.gz', 2),
+                    'cellNames': ('barcodes.tsv.gz', 0)}
+        elif os.path.isfile(self.loc + 'genes.tsv'):
+            self.matFn = self.loc + 'matrix.mtx'
+            grps = {'featureIds': ('genes.tsv', 0),
+                    'featureNames': ('genes.tsv', 1),
+                    'featureTypes': None, 'cellNames': ('barcodes.tsv', 0)}
+        else:
+            raise IOError("ERROR: Couldn't find files")
+        return grps
+
+    def _read_dataset(self, key: Optional[str] = None):
+        return [x.split('\t')[self.grpNames[key][1]] for x in
+                FileReader(self.loc + self.grpNames[key][0],
+                           by_line=True).consume()]
+
+    def consume(self, mtx_chunk_size: int = int(1e5)) -> \
+            Generator[List[np.ndarray], None, None]:
+        split_idx = self.assayFeats.T.end.values
+        mtx = MtxReader(self.matFn, self.nFeatures, mtx_chunk_size)
+        for a in mtx.consume():
+            yield np.split(a, split_idx)[:-1]
