@@ -12,7 +12,9 @@ import pandas as pd
 import zarr
 
 
-__all__ = ['mtx_to_h5', 'csv_to_h5', 'merge_h5', 'extract_cells_from_h5']
+__all__ = ['mtx_to_h5', 'csv_to_h5', 'merge_h5', 'extract_cells_from_h5',
+           'FileReader', 'MtxReader', 'CrReader', 'CrH5Reader', 'CrDirReader',
+           'CrToZarr', 'SubSetZarr']
 
 tqdm_bar = '{l_bar} {remaining}'
 
