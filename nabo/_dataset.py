@@ -17,7 +17,7 @@ tqdm_bar = '{l_bar} {remaining}'
 @numba.jit()
 def clr(X):
     g = np.exp(np.log(X + 1).mean())
-    return np.log((X + 1) / g)
+    return np.log((X/g)+1)
 
 
 class ExpDict(dict):
