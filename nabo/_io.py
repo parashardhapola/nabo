@@ -673,3 +673,47 @@ def h5_to_mtx(fn, outdir, temp_suffix):
         h.write('\n'.join([x+'\t'+x for x in data.genes]))
     with open('%s/barcodes.tsv' % temp_suffix, 'w') as h:
         h.write('\n'.join(data.cells))
+
+class FileReader:
+    def __init__(self, fn: str, chunk_size: int = 10000,
+                 by_line: bool = False):
+        self.fn = fn
+        self.chunkSize = chunk_size
+        self._isCompressed = self._check_compressed()
+        self.byLine = by_line
+
+    def _check_compressed(self) -> bool:
+        if self.fn.rsplit('.', 1)[-1] == 'gz':
+            return True
+        return False
+
+    def _open(self) -> iter:
+        try:
+            if self._isCompressed:
+                return gzip.open(self.fn, mode='rt')
+            else:
+                return open(self.fn, 'r')
+        except (OSError, IOError, FileNotFoundError):
+            raise FileNotFoundError("ERROR: FILE NOT FOUND: %s" % self.fn)
+
+    def _read_chunk(self, fh: IO) -> Generator[str, None, None]:
+        while True:
+            chunk = fh.readlines(self.chunkSize)
+            if not chunk:
+                break
+            yield chunk
+
+    def consume(self) -> Generator[str, None, None]:
+        fh = self._open()
+        for i in self._read_chunk(fh):
+            if self.byLine:
+                for j in map(str.rstrip, i):
+                    yield j
+            else:
+                yield list(map(str.rstrip, i))
+        fh.close()
+
+    def __repr__(self):
+        return (
+            f"FileReader:\n File: {self.fn}\n Compressed: {self._isCompressed}")
+
