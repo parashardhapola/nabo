@@ -876,3 +876,43 @@ class CrDirReader(CrReader):
         mtx = MtxReader(self.matFn, self.nFeatures, mtx_chunk_size)
         for a in mtx.consume():
             yield np.split(a, split_idx)[:-1]
+
+
+class CrToZarr:
+    def __init__(self, cr: CrReader, zarr_fn: str):
+        self.cr = cr
+        self.z = self._initialize_store(zarr_fn, (1000, 1000))
+
+    def _initialize_store(self, fn: str,
+                          chunk_shape: Tuple[int, int]) -> zarr.Group:
+        z = zarr.open(fn, mode='w')
+        for assay in self.cr.assayFeats.columns:
+            g = z.create_group(assay)
+            g.create_dataset('counts', chunks=chunk_shape, dtype='i4',
+                             shape=(self.cr.nCells,
+                                    self.cr.assayFeats[assay]['nFeatures']))
+            for i in ['featureIds', 'featureNames', 'cellNames']:
+                data = self.cr.__getattribute__(i)(assay)
+                dtype = 'U' + str(max([len(x) for x in data]))
+                g.create_dataset(i, data=data, shape=len(data), dtype=dtype)
+        return z
+
+    def _read_stream(self, show_progress: bool) -> \
+            Generator[np.ndarray, None, None]:
+        if show_progress:
+            for i in tqdm(self.cr.consume(), total=self.cr.nCells):
+                yield i
+        else:
+            for i in self.cr.consume():
+                yield i
+
+    def dump(self, chunk_size: int = 100, show_progress: bool = True) -> None:
+        stores = [self.z["%s/counts" % x] for x in self.cr.assayFeats.columns]
+        n_stores = len(stores)
+        chunk, p = [], 0
+        for n, i in enumerate(self._read_stream(show_progress), start=1):
+            chunk.append(i)
+            if n % chunk_size == 0 or n == self.cr.nCells:
+                for j in range(n_stores):
+                    stores[j][p:n] = [x[j] for x in chunk]
+                chunk, p = [], n
