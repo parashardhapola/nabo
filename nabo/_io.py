@@ -717,3 +717,30 @@ class FileReader:
         return (
             f"FileReader:\n File: {self.fn}\n Compressed: {self._isCompressed}")
 
+class MtxReader(FileReader):
+    def __init__(self, fn: str, n_features: int, chunk_size=int(1e4)):
+        super().__init__(fn, chunk_size, by_line=False)
+        self.nFeatures = n_features
+
+    def _to_dense(self, i: np.ndarray) -> np.ndarray:
+        a = np.zeros(self.nFeatures, dtype=int)
+        a[i[:, 0] - 1] = i[:, 2]
+        return a
+
+    def consume(self) -> Generator[np.array, None, None]:
+        fh = self._open()
+        [next(fh) for _ in range(3)]
+        carry_chunk: np.ndarray = np.ndarray((0, 0))
+        for chunk in self._read_chunk(fh):
+            chunk = map(lambda x: np.fromstring(x, sep=' ', dtype=int), chunk)
+            chunk = np.array(list(carry_chunk) + list(chunk))
+            start: int = 0
+            pos: np.ndarray = np.where(np.diff(chunk[:, 1]) == 1)[0] + 1
+            for end in pos:
+                yield self._to_dense(chunk[start:end])
+                start = end
+            carry_chunk = chunk[start:]
+        yield self._to_dense(carry_chunk)
+        fh.close()
+
+
