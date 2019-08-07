@@ -883,9 +883,9 @@ class CrDirReader(CrReader):
 
 
 class CrToZarr:
-    def __init__(self, cr: CrReader, zarr_fn: str):
+    def __init__(self, cr: CrReader, zarr_fn: str, chunk_shape=(1000, 1000)):
         self.cr = cr
-        self.z = self._initialize_store(zarr_fn, (1000, 1000))
+        self.z = self._initialize_store(zarr_fn, chunk_shape)
 
     def _initialize_store(self, fn: str,
                           chunk_shape: Tuple[int, int]) -> zarr.Group:
@@ -895,10 +895,13 @@ class CrToZarr:
             g.create_dataset('counts', chunks=chunk_shape, dtype='i4',
                              shape=(self.cr.nCells,
                                     self.cr.assayFeats[assay]['nFeatures']))
-            for i in ['featureIds', 'featureNames', 'cellNames']:
-                data = self.cr.__getattribute__(i)(assay)
+            chunks = [chunk_shape[1], chunk_shape[1], chunk_shape[0]]
+            attrs = ['featureIds', 'featureNames', 'cellNames']
+            for i in range(len(attrs)):
+                data = self.cr.__getattribute__(attrs[i])(assay)
                 dtype = 'U' + str(max([len(x) for x in data]))
-                g.create_dataset(i, data=data, shape=len(data), dtype=dtype)
+                g.create_dataset(attrs[i], data=data, chunks=chunks[i],
+                                 shape=len(data), dtype=dtype)
         return z
 
     def _read_stream(self, show_progress: bool) -> \
