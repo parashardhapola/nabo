@@ -5,9 +5,11 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 __all__ = ['correct_var']
 
 
-def correct_var(stats, n_bins: int = 100,
-                lowess_frac: float = 0.4) -> pd.Series:
-    stats = stats[stats.use][['mu', 'sigmas']].apply(np.log)
+def correct_var(mu, sigmas, n_bins: int = 100,
+                lowess_frac: float = 0.4) -> np.array:
+    stats = pd.DataFrame({'mu': mu, 'sigmas': sigmas})
+    valid = stats.mu > 0
+    stats = stats[valid].apply(np.log)
     bin_edges = np.histogram(stats.mu, bins=n_bins)[1]
     bin_edges[-1] += 0.1  # For including last gene
     bin_genes = []
@@ -29,4 +31,5 @@ def correct_var(stats, n_bins: int = 100,
     for bcf, genes in zip(bin_cor_fac, bin_genes):
         for gene in genes:
             fixed_var[gene] = np.e ** (stats.sigmas[gene] - bcf)
-    return pd.Series(fixed_var)
+    fixed_var = pd.Series(fixed_var).reindex(list(range(len(mu))))
+    return fixed_var.values

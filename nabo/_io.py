@@ -895,12 +895,11 @@ class CrToZarr:
             g.create_dataset('counts', chunks=chunk_shape, dtype='i4',
                              shape=(self.cr.nCells,
                                     self.cr.assayFeats[assay]['nFeatures']))
-            chunks = [chunk_shape[1], chunk_shape[1], chunk_shape[0]]
             attrs = ['featureIds', 'featureNames', 'cellNames']
             for i in range(len(attrs)):
                 data = self.cr.__getattribute__(attrs[i])(assay)
                 dtype = 'U' + str(max([len(x) for x in data]))
-                g.create_dataset(attrs[i], data=data, chunks=chunks[i],
+                g.create_dataset(attrs[i], data=data, chunks=False,
                                  shape=len(data), dtype=dtype)
         return z
 
