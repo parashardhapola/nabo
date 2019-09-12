@@ -7,7 +7,7 @@ Nabo is a flexible Python package that allows projections of cells from one popu
 Comparing two or more cell populations can be of interest due to multiple reasons:
     * Identifying cells of origin
     * Comparison across replicates
-    * Testing populations proportions change across conditions
+    * Testing population proportions change across conditions
 
 Why use Nabo:
     * No assumptions with respect to nature of data. One can use raw counts or normalized data.
@@ -18,6 +18,6 @@ Why use Nabo:
 Unique features of Nabo:
     * Allows mapping multiple samples over the same reference dataset
     * Visual and statistical comparison of different projections
-    * Uses graph optimized hierarchical clustering approach to identify cell groups in the reference population
+    * Uses graph-optimized hierarchical clustering approach to identify cell groups in the reference population
     * Provides inbuilt methods to generate null expectation projections
     * Compatible with multiple data formats.
