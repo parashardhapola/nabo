@@ -39,6 +39,7 @@ release = ''
 # ones.
 extensions = [
     'nbsphinx',
+    'IPython.sphinxext.ipython_console_highlighting',
     'sphinx.ext.autodoc',
     'sphinx.ext.coverage',
     'sphinx.ext.mathjax',

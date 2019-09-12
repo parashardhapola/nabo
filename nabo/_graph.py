@@ -415,7 +415,7 @@ class Graph(nx.Graph):
 
     def import_layout(self, pos_dict) -> None:
         """
-         Alternatively one can provide a
+        Alternatively one can provide a
         dictionary with keys as node name and values as coordinate (x,
         y) tuple.
 
@@ -805,8 +805,8 @@ class Graph(nx.Graph):
         :param incl_unmapped: If True, then includes unmapped reference
                               nodes in the dictionary with value set at 0
                               Default: False)
-        :return: Dictionary with reference node names as keys and values as
-        mean mapping specificity of their mapped target nodes
+        :return: Dictionary with reference node names as keys and values as 
+                 mean mapping specificity of their mapped target nodes
         """
 
         back_prom = {}

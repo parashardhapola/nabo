@@ -33,7 +33,7 @@ if __name__ == "__main__":
         author_email='parashar.dhapola@gmail.com',
         maintainer='Parashar Dhapola',
         maintainer_email='parashar.dhapola@gmail.com',
-        url='https://github.com/parashardhapola/nabo',
+        url='https://github.com/karlssonlab/nabo',
         license='BSD 3-Clause',
         classifiers=CLASSIFIERS,
         keywords=KEYWORDS,
