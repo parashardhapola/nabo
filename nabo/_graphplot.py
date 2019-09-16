@@ -88,6 +88,7 @@ class GraphPlot:
     :param label_attr_space: Spacing between labels. Only used when
                              `label_attr_type` is 'centroid'
     :param label_attr_fs: Label font size
+    :param rasterized: If True, then rasterize the scatter points
     :param save_name: File name for saving figure
     :param fig_size: Figure size. Should be a tuple (width, height)
     :param show_fig: If True then show figure
@@ -112,8 +113,8 @@ class GraphPlot:
                  title=None, title_fs=30,
                  label_attr=None, label_attr_type='centroid',
                  label_attr_pos=(1, 1), label_attr_space=0.05,
-                 label_attr_fs=16,
-                 save_name=None, dpi=200, fig_size=(5, 5), show_fig=True,
+                 label_attr_fs=16, rasterized=True,
+                 save_name=None, dpi=300, fig_size=(5, 5), show_fig=True,
                  remove_axes=True, ax=None, verbose=False):
         if texts is None:
             texts = []
@@ -153,6 +154,7 @@ class GraphPlot:
         self.labelAttrFontSize = label_attr_fs
         self.saveName = save_name
         self.dpi = dpi
+        self.rasterized = rasterized
         self.figSize = fig_size
         self.showFig = show_fig
         self.removeAxes = remove_axes
@@ -446,7 +448,7 @@ class GraphPlot:
         self.scatterObj = self.ax.scatter(
             pos[0], pos[1], s=sizes, c=np.array(colours),
             lw=self.vertexLineWidth, edgecolors=self.vertexEdgeColor,
-            zorder=2, alpha=self.vertexAlpha
+            zorder=2, alpha=self.vertexAlpha, rasterized=True
         )
 
     def _place_attr_label(self):
