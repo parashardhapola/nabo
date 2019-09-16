@@ -466,6 +466,7 @@ class Dataset:
         actually deleted from the dataset but just the keepGenesIdx
         attribute is
         modified.
+
         :param gene_names: List of gene names to remove
         :param verbose: Print message about number of cells removed (
                         Default: False)

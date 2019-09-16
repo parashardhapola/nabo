@@ -27,7 +27,12 @@ Extract the downloaded `mll_enl.zip` file to any folder. Once extracted, you wil
 		├── genes.tsv
 		└── matrix.mtx
 
-Files with .ipynb extension are notebooks file. If you do not have a jupyter notebook server running, then open your terminal and type `jupyter notebook`. Your browser should open a new window automatically, navigate to the notebook location and launch the notebooks. Start with '1_preprocessing.ipynb' or continue from where you last left. Please run '1_preprocessing' notebook first, followed by '2_mapping' and thereafter, the rest two notebooks can be run in any order.
+Files with .ipynb extension are notebook files. If you do not already have a
+jupyter notebook server running, then open your terminal and type `jupyter
+notebook`.  Your browser should open a new window automatically. Navigate to
+the notebook location and launch the notebooks. Start with
+'1_preprocessing.ipynb'. That needs to be run first, followed by '2_mapping'.
+After that, the last two notebooks can be run in any order.
 
 Read static notebooks here:
 

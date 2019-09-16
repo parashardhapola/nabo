@@ -3,7 +3,7 @@ Frequently asked questions
 ==========================
 
 How is Nabo different than other single-cell RNA-Seq batch correction tools like `MNNcorrect <https://www.nature.com/articles/nbt.4091>`_, `Seurat CCA <https://www.nature.com/articles/nbt.4096>`_  and `Scanorama <https://www.nature.com/articles/s41587-019-0113-3>`_ ?
---------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 All these tools implement theoretically sound principles for data integration and often should be first tools in one's analytical pipeline if batch effect is suspected. With Nabo, one explicitly maps one sample over the other, this might be especially useful when there are differences between samples but still a comparison of heterogeneity is required. For example, a particular cell type in over-represented in a tumor tissue, however the tumor cells are very different from normal cells. Cases like these would be easy to analyze with Nabo.
 
 How do I choose 'k' in for running mapping?
@@ -25,12 +25,12 @@ Any number of samples can be projected on the reference graph. The results from 
 
 Can I perform tSNE using Nabo?
 ------------------------------
-Nabo does not generate tSNE plots as these functionalities are already there in other excellent packages like `scanpy <http://scanpy.readthedocs.io/en/latest/>`_ and `Seurat <https://satijalab.org/seurat/>`_. You can also use the `Multicore tSNE  <https://github.com/DmitryUlyanov/Multicore-TSNE>`_ package after exporting normalized counts using `Dataframe.export_as_dataframe`. 
+Nabo does not generate tSNE plots as these functionalities are already there in other excellent packages like `scanpy <http://scanpy.readthedocs.io/en/latest/>`_ and `Seurat <https://satijalab.org/seurat/>`_. You can also use the `Multicore tSNE  <https://github.com/DmitryUlyanov/Multicore-TSNE>`_ package after exporting normalized counts using ``Dataframe.export_as_dataframe``. 
 
 Can I perform pseudotime analysis on Nabo?
 -------------------------------------------
 `Graph` module of nabo has an implementation of `PBA <https://www.pnas.org/content/115/10/E2467>`_ algorithm. This can be used to obtain pseudotime values for each of the cell in the reference graph.
 
-Is there a reason why this package is called Nabo
--------------------------------------------------
-Yes! Nabo means neighbour in old Scanian Swedish / Norwegian and we used it because Nabo heavily relies on the concept of nearest neighbour.
+Is there a reason why this package is called Nabo?
+--------------------------------------------------
+Yes! Nabo means neighbour in old Scanian Swedish / Norwegian, and we used it because Nabo heavily relies on the concept of nearest neighbour.
