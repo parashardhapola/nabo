@@ -100,18 +100,21 @@ class Dataset:
         self.cellIdx: Dict[str, int] = {x: n for n, x in enumerate(self.cells)}
         self.geneIdx: Dict[str, int] = {x: n for n, x in enumerate(self.genes)}
         if self._recalc is True and 'processed_data' in h5:
+            print("INFO: Deleting existing `processed_data` group from HDF5 file", flush=True)
             del h5['processed_data']
         if 'processed_data' in h5:
             pd_grp = h5['processed_data']
         else:
             pd_grp = h5.create_group('processed_data')
-        if 'keep_cells_idx' in pd_grp and 'keep_genes_idx' in pd_grp:
+        if 'keep_cells_idx' in pd_grp:
             self.keepCellsIdx = np.array(list(pd_grp['keep_cells_idx'][:]))
-            self.keepGenesIdx = np.array(list(pd_grp['keep_genes_idx'][:]))
-            print("INFO: Cached filtered gene and cell names loaded",
-                  flush=True)
+            print("INFO: Cached filtered cells loaded", flush=True)
         else:
             self.keepCellsIdx = np.array(list(range(self.rawNCells)))
+        if 'keep_genes_idx' in pd_grp:
+            self.keepGenesIdx = np.array(list(pd_grp['keep_genes_idx'][:]))
+            print("INFO: Cached filtered genes loaded", flush=True)
+        else:
             self.keepGenesIdx = np.array(list(range(self.rawNGenes)))
         if 'sf' in pd_grp:
             self.sf = pd_grp['sf'][:]
