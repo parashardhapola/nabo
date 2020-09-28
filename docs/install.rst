@@ -5,7 +5,7 @@ Installation
 Requirements
 ------------
 
-Python version greater than 3.6.0
+Python >= 3.6.0
 
 Short version
 -------------
@@ -43,7 +43,7 @@ https://conda.io/miniconda.html (version Python 3.6 or above).
 
 If you are confused about 64-bit or 32-bit see this nice `post <https://www.techsoup.org/support/articles-and-how-tos/do-i-need-the-32bit-or-64bit>`_. 
 Once you have downloaded Miniconda please follow their instructions `here <https://conda.io/projects/conda/en/latest/user-guide/install/index.html#regular-installation>`_ to install it.
-Once installed, please confirm that you now have a Python version greater than 3.6.0 by typing ``python --version`` in your terminal.
+Once installed, please confirm that you now have a Python version equal to or greater than 3.6.0 by typing ``python --version`` in your terminal.
 
 **Step 4:**
 
