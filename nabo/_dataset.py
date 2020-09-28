@@ -88,8 +88,8 @@ class Dataset:
         h5: h5py.File = h5py.File(self.h5Fn, mode='a', libver='latest')
         try:
             # Never sort these! This order is crucial
-            self.cells = [x.decode('UTF-8') for x in h5['names']['cells']]
-            self.genes = [x.decode('UTF-8') for x in h5['names']['genes']]
+            self.cells = [x.decode('UTF-8') for x in h5['names']['cells'][:]]
+            self.genes = [x.decode('UTF-8') for x in h5['names']['genes'][:]]
         except KeyError:
             self.cells, self.genes = [], []
             raise IOError("FATAL ERROR: Could not extract gene/cell names "
@@ -205,8 +205,7 @@ class Dataset:
             else:
                 return a
 
-    def get_cum_exp(self, genes: List[str], report_missing: bool = False) -> \
-            np.ndarray:
+    def get_cum_exp(self, genes: List[str], report_missing: bool = False) -> np.ndarray:
         """
         Calculates cumulative expression of provided genes for each cell.
 
