@@ -11,7 +11,7 @@ try:
     from datashader.bundling import hammer_bundle
 except ImportError:
     hammer_bundle = None
-    print("WARNING: datashader not installed. Will be unble to perform edge "
+    print("WARNING: datashader not installed. Will be unable to perform edge "
           "bundling")
 
 plt.style.use('fivethirtyeight')
