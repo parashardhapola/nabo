@@ -1,18 +1,7 @@
-from ._graph import Graph
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
-from natsort import natsorted
-from matplotlib.collections import LineCollection
-from matplotlib import colors
 import pandas as pd
-
-try:
-    from datashader.bundling import hammer_bundle
-except ImportError:
-    hammer_bundle = None
-    print("WARNING: datashader not installed. Will be unable to perform edge "
-          "bundling")
+from ._graph import Graph
 
 plt.style.use('fivethirtyeight')
 
@@ -201,6 +190,15 @@ class GraphPlot:
         return "GraphPlot of %d nodes" % len(self.positions)
 
     def _plot_edges(self):
+        try:
+            from datashader.bundling import hammer_bundle
+        except ImportError:
+            hammer_bundle = None
+            print("WARNING: datashader not installed. Will be unable to perform edge "
+                  "bundling")
+
+        from matplotlib.collections import LineCollection
+
         def make_bundles(nodes, edges):
             node_name_map = {
                 x: n + 1 for n, x in enumerate(list(nodes))
@@ -276,6 +274,10 @@ class GraphPlot:
                              alpha=self.edgeAlpha, zorder=1)
 
     def _set_vertex_color(self):
+        from natsort import natsorted
+        import seaborn as sns
+        from matplotlib import colors
+
         if isinstance(self.vertexColorDefault, str):
             self.vertexColorDefault = colors.to_rgb(
                 self.vertexColorDefault)
@@ -430,6 +432,8 @@ class GraphPlot:
             self.vertexSize = {x: 25 for x in self.graph.nodes()}
 
     def _plot_nodes(self):
+        from matplotlib import colors
+
         pos, colours, sizes = [], [], []
         min_size = min(self.vertexSize.values())
         for i in self.positions:

@@ -2,11 +2,7 @@ import h5py
 import numpy as np
 from tqdm import tqdm
 from typing import Dict, List, Generator, Tuple
-from ._plotting import plot_summary_data, plot_mean_var
 import pandas as pd
-import re
-from statsmodels.nonparametric.smoothers_lowess import lowess
-from sklearn.decomposition import IncrementalPCA
 import numba
 
 __all__ = ['Dataset']
@@ -15,9 +11,9 @@ tqdm_bar = '{l_bar} {remaining}'
 
 
 @numba.jit()
-def clr(X):
-    g = np.exp(np.log(X + 1).mean())
-    return np.log((X/g)+1)
+def clr(x):
+    g = np.exp(np.log(x + 1).mean())
+    return np.log((x/g)+1)
 
 
 class ExpDict(dict):
@@ -283,6 +279,8 @@ class Dataset:
         :param patterns: List of Regex pattern
         :return: List of gene names matching the pattern
         """
+        import re
+
         genes = []
         for sp in patterns:
             genes.extend(
@@ -501,6 +499,8 @@ class Dataset:
 
         :return: None
         """
+        from ._plotting import plot_summary_data
+
         tot_exp_per_cell = self.get_total_exp_per_cell()
         genes_per_cell = self.get_genes_per_cell()
         percent_mito = (100 * self.get_cum_exp(self.mitoGenes) /
@@ -529,6 +529,7 @@ class Dataset:
         :param showfig:
         :return: None
         """
+        from ._plotting import plot_summary_data
 
         tot_exp_per_cell = self.get_total_exp_per_cell()[self.keepCellsIdx]
         genes_per_cell = self.get_genes_per_cell()[self.keepCellsIdx]
@@ -650,6 +651,8 @@ class Dataset:
                             `lowess` function
         :return: None
         """
+        from statsmodels.nonparametric.smoothers_lowess import lowess
+
         if self.geneStats is None:
             self.set_gene_stats()
         stats = self.geneStats[self.geneStats.valid_gene].drop(
@@ -711,6 +714,8 @@ class Dataset:
                              default: False)
         :return: None
         """
+        from ._plotting import plot_mean_var
+
         if use_corrected_var is True and 'fixed_var' not in self.geneStats:
             raise ValueError('ERROR: "use_corrected_var" parameter is set to '
                              'True. Either  run "correct_var" method first '
@@ -927,6 +932,7 @@ class Dataset:
                              default: False)
         :return: None
         """
+        from sklearn.decomposition import IncrementalPCA
 
         def make_eq_bins(n, bs):
             a = n // bs
