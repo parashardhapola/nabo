@@ -35,6 +35,8 @@ def plot_summary_data(data, plot_names, color: str,
         sns.stripplot(data=val, jitter=0.4, ax=ax, orient='v',
                       s=1.1, color='k', alpha=0.4)
         ax.set_ylabel(plot_names[i], fontsize=13)
+        ax.set_xlabel('')
+        ax.set_xticks([])
         if display_stats:
             if i < 2:
                 ax.set_title('Min: %d, Max: %d, Median: %d' % (
