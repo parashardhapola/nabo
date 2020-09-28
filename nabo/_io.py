@@ -670,4 +670,3 @@ def h5_to_mtx(fn, outdir, temp_suffix):
         h.write('\n'.join([x+'\t'+x for x in data.genes]))
     with open('%s/barcodes.tsv' % temp_suffix, 'w') as h:
         h.write('\n'.join(data.cells))
-
