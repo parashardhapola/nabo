@@ -2,13 +2,9 @@ import h5py
 from typing import List, Dict
 import networkx as nx
 import numpy as np
-from fa2 import ForceAtlas2
-from itertools import combinations
-import operator
 import os
 from collections import Counter
 import pandas as pd
-import hac
 import json
 from tqdm import tqdm
 
@@ -212,6 +208,8 @@ class Graph(nx.Graph):
         :param gravity:
         :return: None
         """
+        from fa2 import ForceAtlas2
+
         force_atlas = ForceAtlas2(
             outboundAttractionDistribution=outbound_attraction_distribution,
             edgeWeightInfluence=edge_weight_influence,
@@ -253,6 +251,8 @@ class Graph(nx.Graph):
         :param n_clusters: Number of clusters
         :return: None
         """
+        import hac
+
         if self._agglomDendrogram is None:
             clusterer = hac.GreedyAgglomerativeClusterer()
             self._agglomDendrogram = clusterer.cluster(self.refG)
@@ -725,6 +725,8 @@ class Graph(nx.Graph):
                              keys are cluster labels and values are the number
                              of target cells classified to that cluster
         """
+        import operator
+
         if cluster_dict is None:
             self._validate_clusters()
             cluster_dict = self.clusters
@@ -938,6 +940,7 @@ class Graph(nx.Graph):
                             this path distance (default: 0).
         :return: List of nodes
         """
+        from itertools import combinations
 
         def get_neighbours(g, n):
             g.remove_edges_from(list(combinations(n, 2)))

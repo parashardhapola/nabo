@@ -1,11 +1,11 @@
 import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d # Needed for 3D UMAPS
 import seaborn as sns
 import numpy as np
 from typing import Dict, List
-plt.style.use('fivethirtyeight')
-from natsort import natsorted, ns
+from natsort import natsorted
 import pandas as pd
+
+plt.style.use('fivethirtyeight')
 
 __all__ = ['plot_summary_data', 'plot_mean_var', 'plot_scree',
            'plot_cluster_scores', 'plot_target_class_counts',
@@ -30,11 +30,13 @@ def plot_summary_data(data, plot_names, color: str,
     for i in range(len(plot_names)):
         val = np.array(data[i])
         ax = axis[i]
-        sns.violinplot(val, ax=ax, linewidth=1, orient='v',
+        sns.violinplot(data=val, ax=ax, linewidth=1, orient='v',
                        inner=None, cut=0, color=color)
-        sns.stripplot(val, jitter=0.4, ax=ax, orient='v',
+        sns.stripplot(data=val, jitter=0.4, ax=ax, orient='v',
                       s=1.1, color='k', alpha=0.4)
         ax.set_ylabel(plot_names[i], fontsize=13)
+        ax.set_xlabel('')
+        ax.set_xticks([])
         if display_stats:
             if i < 2:
                 ax.set_title('Min: %d, Max: %d, Median: %d' % (
@@ -368,6 +370,8 @@ def plot_3dumap(dims, figsize=(6, 6), vc='k', vs=15,
                 alpha=0.7, grid_alpha=0.4,
                 cbar=False, orient=None,
                 savename=None, dpi=300):
+    from mpl_toolkits import mplot3d
+
     if cbar:
         fig = plt.figure(figsize=(figsize[0]+1, figsize))
     else:

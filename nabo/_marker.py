@@ -1,12 +1,8 @@
 from typing import List, Dict
 import pandas as pd
-from scipy.stats import mannwhitneyu
-from statsmodels.sandbox.stats.multicomp import multipletests
 from tqdm import tqdm
-from ._dataset import Dataset
-from ._graph import Graph
 import numpy as np
-from collections import Counter
+from ._dataset import Dataset
 
 __all__ = ['run_de_test', 'find_cluster_markers', 'show_full_table']
 
@@ -38,6 +34,8 @@ def run_de_test(dataset1: Dataset, dataset2,
     :param tqdm_msg: Message to print while displaying progress
     :return: pd.Dataframe
     """
+    from scipy.stats import mannwhitneyu
+    from statsmodels.sandbox.stats.multicomp import multipletests
 
     test_cells_idx = [dataset1.cellIdx[x] for x in test_cells]
     control_cells_idx_group = []
@@ -138,6 +136,8 @@ def find_cluster_markers(clusters: dict, dataset: Dataset,
              element is a dictionary where keys are cluster numbers and values
              are lists of marker genes for the corresponding clusters
     """
+    from collections import Counter
+
     cluster_groups = {}
     for k, v in clusters.items():
         if v not in cluster_groups:

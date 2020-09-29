@@ -1,5 +1,4 @@
 import pandas as pd
-import umap
 import h5py
 
 __all__ = ['make_umap']
@@ -24,6 +23,8 @@ def make_umap(pca_h5: str, use_comps: int, umap_dims: int, n_neighbors: int,
     :param index_suffix: Suffix to be appended to each cell name
     :return:
     """
+    import umap
+
     h5data = h5py.File(pca_h5, mode='r', swmr=True)
 
     df = pd.DataFrame(

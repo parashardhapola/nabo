@@ -2,11 +2,9 @@ import h5py
 import numpy as np
 import os
 from tqdm import tqdm
-from collections import Counter
 from typing import List
 import random
 import gzip
-from ._dataset import Dataset
 
 
 __all__ = ['mtx_to_h5', 'csv_to_h5', 'merge_h5', 'extract_cells_from_h5']
@@ -20,6 +18,8 @@ def fix_dup_names(names):
     :param names:
     :return:
     """
+    from collections import Counter
+
     names_upper = [x.upper() for x in names]
     dup_names = {item: 0 for item, count in
                  Counter(names_upper).items() if count > 1}
@@ -643,6 +643,8 @@ def extract_cells_from_h5(in_fn: str, out_fn: str,
 
 
 def h5_to_mtx(fn, outdir, temp_suffix):
+    from ._dataset import Dataset
+
     data = Dataset(fn, force_recalc=True)
     h5 = h5py.File(fn, mode='r')
     total = 0
@@ -670,4 +672,3 @@ def h5_to_mtx(fn, outdir, temp_suffix):
         h.write('\n'.join([x+'\t'+x for x in data.genes]))
     with open('%s/barcodes.tsv' % temp_suffix, 'w') as h:
         h.write('\n'.join(data.cells))
-

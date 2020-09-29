@@ -2,11 +2,7 @@ import h5py
 import numpy as np
 from tqdm import tqdm
 from typing import Dict, List, Generator, Tuple
-from ._plotting import plot_summary_data, plot_mean_var
 import pandas as pd
-import re
-from statsmodels.nonparametric.smoothers_lowess import lowess
-from sklearn.decomposition import IncrementalPCA
 import numba
 
 __all__ = ['Dataset']
@@ -15,9 +11,9 @@ tqdm_bar = '{l_bar} {remaining}'
 
 
 @numba.jit()
-def clr(X):
-    g = np.exp(np.log(X + 1).mean())
-    return np.log((X/g)+1)
+def clr(x):
+    g = np.exp(np.log(x + 1).mean())
+    return np.log((x/g)+1)
 
 
 class ExpDict(dict):
@@ -92,8 +88,8 @@ class Dataset:
         h5: h5py.File = h5py.File(self.h5Fn, mode='a', libver='latest')
         try:
             # Never sort these! This order is crucial
-            self.cells = [x.decode('UTF-8') for x in h5['names']['cells']]
-            self.genes = [x.decode('UTF-8') for x in h5['names']['genes']]
+            self.cells = [x.decode('UTF-8') for x in h5['names']['cells'][:]]
+            self.genes = [x.decode('UTF-8') for x in h5['names']['genes'][:]]
         except KeyError:
             self.cells, self.genes = [], []
             raise IOError("FATAL ERROR: Could not extract gene/cell names "
@@ -104,18 +100,21 @@ class Dataset:
         self.cellIdx: Dict[str, int] = {x: n for n, x in enumerate(self.cells)}
         self.geneIdx: Dict[str, int] = {x: n for n, x in enumerate(self.genes)}
         if self._recalc is True and 'processed_data' in h5:
+            print("INFO: Deleting existing `processed_data` group from HDF5 file", flush=True)
             del h5['processed_data']
         if 'processed_data' in h5:
             pd_grp = h5['processed_data']
         else:
             pd_grp = h5.create_group('processed_data')
-        if 'keep_cells_idx' in pd_grp and 'keep_genes_idx' in pd_grp:
+        if 'keep_cells_idx' in pd_grp:
             self.keepCellsIdx = np.array(list(pd_grp['keep_cells_idx'][:]))
-            self.keepGenesIdx = np.array(list(pd_grp['keep_genes_idx'][:]))
-            print("INFO: Cached filtered gene and cell names loaded",
-                  flush=True)
+            print("INFO: Cached filtered cells loaded", flush=True)
         else:
             self.keepCellsIdx = np.array(list(range(self.rawNCells)))
+        if 'keep_genes_idx' in pd_grp:
+            self.keepGenesIdx = np.array(list(pd_grp['keep_genes_idx'][:]))
+            print("INFO: Cached filtered genes loaded", flush=True)
+        else:
             self.keepGenesIdx = np.array(list(range(self.rawNGenes)))
         if 'sf' in pd_grp:
             self.sf = pd_grp['sf'][:]
@@ -206,8 +205,7 @@ class Dataset:
             else:
                 return a
 
-    def get_cum_exp(self, genes: List[str], report_missing: bool = False) -> \
-            np.ndarray:
+    def get_cum_exp(self, genes: List[str], report_missing: bool = False) -> np.ndarray:
         """
         Calculates cumulative expression of provided genes for each cell.
 
@@ -283,6 +281,8 @@ class Dataset:
         :param patterns: List of Regex pattern
         :return: List of gene names matching the pattern
         """
+        import re
+
         genes = []
         for sp in patterns:
             genes.extend(
@@ -501,6 +501,8 @@ class Dataset:
 
         :return: None
         """
+        from ._plotting import plot_summary_data
+
         tot_exp_per_cell = self.get_total_exp_per_cell()
         genes_per_cell = self.get_genes_per_cell()
         percent_mito = (100 * self.get_cum_exp(self.mitoGenes) /
@@ -529,6 +531,7 @@ class Dataset:
         :param showfig:
         :return: None
         """
+        from ._plotting import plot_summary_data
 
         tot_exp_per_cell = self.get_total_exp_per_cell()[self.keepCellsIdx]
         genes_per_cell = self.get_genes_per_cell()[self.keepCellsIdx]
@@ -650,6 +653,8 @@ class Dataset:
                             `lowess` function
         :return: None
         """
+        from statsmodels.nonparametric.smoothers_lowess import lowess
+
         if self.geneStats is None:
             self.set_gene_stats()
         stats = self.geneStats[self.geneStats.valid_gene].drop(
@@ -711,6 +716,8 @@ class Dataset:
                              default: False)
         :return: None
         """
+        from ._plotting import plot_mean_var
+
         if use_corrected_var is True and 'fixed_var' not in self.geneStats:
             raise ValueError('ERROR: "use_corrected_var" parameter is set to '
                              'True. Either  run "correct_var" method first '
@@ -927,6 +934,7 @@ class Dataset:
                              default: False)
         :return: None
         """
+        from sklearn.decomposition import IncrementalPCA
 
         def make_eq_bins(n, bs):
             a = n // bs
