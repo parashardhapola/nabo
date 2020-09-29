@@ -263,7 +263,7 @@ class Graph(nx.Graph):
                 self.nodes[node]['cluster'] = str(clust_num)
         return None
 
-    def make_leiden_clusters(self, resolution: float, random_seed = 4466) -> None:
+    def make_leiden_clusters(self, resolution: float = 1.0, random_seed = 4466) -> None:
         """
         Leiden clustering
 
@@ -278,7 +278,7 @@ class Graph(nx.Graph):
                               "here: https://github.com/vtraag/leidenalg#installation.")
         import igraph  # python-igraph
 
-        adj = nx.to_scipy_sparse_matrix(self.refG).to_csr()
+        adj = nx.to_scipy_sparse_matrix(self.refG)
         sources, targets = adj.nonzero()
         g = igraph.Graph()
         g.add_vertices(adj.shape[0])
