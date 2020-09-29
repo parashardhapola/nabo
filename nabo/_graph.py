@@ -263,6 +263,34 @@ class Graph(nx.Graph):
                 self.nodes[node]['cluster'] = str(clust_num)
         return None
 
+    def make_leiden_clusters(self, resolution: float, random_seed = 4466) -> None:
+        """
+        Leiden clustering
+
+        :param n_clusters: Number of clusters
+        :return: None
+        """
+
+        try:
+            import leidenalg
+        except ImportError:
+            raise ImportError("ERROR: 'leidenalg' package is not installed. Please find the installation instructions "
+                              "here: https://github.com/vtraag/leidenalg#installation.")
+        import igraph  # python-igraph
+
+        adj = nx.to_scipy_sparse_matrix(self.refG).to_csr()
+        sources, targets = adj.nonzero()
+        g = igraph.Graph()
+        g.add_vertices(adj.shape[0])
+        g.add_edges(list(zip(sources, targets)))
+        g.es['weight'] = adj[sources, targets].A1
+        part = leidenalg.find_partition(g, leidenalg.RBConfigurationVertexPartition, resolution_parameter=resolution,
+                                        seed=random_seed)
+        clusts = np.array(part.membership) + 1
+        for n, c in zip(self.refG.nodes, clusts):
+            self.nodes[n]['cluster'] = str(c)
+        return None
+
     def get_cluster_identity_weights(self) -> pd.Series:
         """
 
