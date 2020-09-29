@@ -232,8 +232,8 @@ def plot_target_class_counts(values: Dict, ref_values: Dict,
                              sort: bool = True, percent: bool = True,
                              enrichment: bool = False, order: bool = None,
                              line_kw: Dict = None, na_label: str = 'NA',
-                             cmap: str ='hls', fig_size: tuple = None,
-                             tick_fs: int = 10, label_fs: int = 12,
+                             colors: Dict = None, cmap: str ='hls', default_color='darkgrey',
+                             fig_size: tuple = None, tick_fs: int = 10, label_fs: int = 12,
                              tlabel_rotation: int = 0, save_name: str = None,
                              display: bool = True) -> None:
     """
@@ -276,7 +276,19 @@ def plot_target_class_counts(values: Dict, ref_values: Dict,
     if order is None:
         order = np.array(natsorted(values.index))
     values = np.array([values[x] for x in order])
-    colors = np.array(sns.color_palette(cmap, len(values)))
+
+    if colors is None:
+        colors = np.array(sns.color_palette(cmap, len(values)))
+    else:
+        temp = []
+        for i in order:
+            if i not in colors:
+                print("WARNING: cluster %s is not present in "
+                      "color dict" % str(i))
+                temp.append(default_color)
+            else:
+                temp.append(colors[i])
+        colors = np.array(list(temp))
 
     if sort is True:
         idx = np.argsort(values)[::-1]
