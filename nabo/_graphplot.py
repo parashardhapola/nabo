@@ -233,7 +233,7 @@ class GraphPlot:
                     x[1] in self.positions and
                     x[2]['weight'] > self.edgeMinWeight
                 ])
-        elif self.drawEdges is 'ref':
+        elif self.drawEdges == 'ref':
             if self.bundleEdges and hammer_bundle is not None:
                 edges = make_bundles(self.graph.refNodes,
                                      self.graph.refG.edges(data=True))
