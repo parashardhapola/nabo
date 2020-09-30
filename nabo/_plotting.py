@@ -160,7 +160,8 @@ def plot_cluster_scores(values: Dict, clusters: Dict, sort: bool = False,
     if order is None:
         order = np.array(natsorted(scores.clusters.unique()))
     scores = scores.groupby('clusters')
-    values = np.array([scores.get_group(x)['values'].values for x in order])
+    values = np.array([scores.get_group(x)['values'].values for x in order],
+                      dtype=object)
     idx = None
     if sort is True:
         idx = np.argsort([np.mean(x) for x in values])
