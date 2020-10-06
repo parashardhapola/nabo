@@ -267,11 +267,11 @@ class GraphPlot:
                 self.ax.add_collection(
                     LineCollection(edges, colors=self.edgeColors,
                                    linewidths=self.edgeLineWidth,
-                                   alpha=self.edgeAlpha, zorder=1))
+                                   alpha=self.edgeAlpha, zorder=1, rasterized=self.rasterized))
             elif len(edges.shape) == 2:
                 self.ax.plot(edges[:, 0], edges[:, 1], c=self.edgeColors,
                              lw=self.edgeLineWidth,
-                             alpha=self.edgeAlpha, zorder=1)
+                             alpha=self.edgeAlpha, zorder=1, rasterized=self.rasterized)
 
     def _set_vertex_color(self):
         from natsort import natsorted
