@@ -7,7 +7,7 @@ import random
 import gzip
 
 
-__all__ = ['mtx_to_h5', 'csv_to_h5', 'merge_h5', 'extract_cells_from_h5']
+__all__ = ['mtx_to_h5', 'csv_to_h5', 'merge_h5', 'extract_cells_from_h5', 'h5_to_mtx']
 
 tqdm_bar = '{l_bar} {remaining}'
 
@@ -642,14 +642,14 @@ def extract_cells_from_h5(in_fn: str, out_fn: str,
     return None
 
 
-def h5_to_mtx(fn, outdir, temp_suffix):
+def h5_to_mtx(fn, outdir):
     from ._dataset import Dataset
 
     data = Dataset(fn, force_recalc=True)
     h5 = h5py.File(fn, mode='r')
     total = 0
-    o1 = temp_suffix + '1'
-    o2 = temp_suffix + '2'
+    o1 = 'nabo.temp1'
+    o2 = 'nabo.temp2'
     with open(o1, 'w') as h:
         for n, i in tqdm(enumerate(data.cells)):
             a = h5['cell_data'][i][:]
@@ -658,17 +658,17 @@ def h5_to_mtx(fn, outdir, temp_suffix):
                            [n+1 for _ in range(len(a))],
                            a['val']]).astype(int).T
             total += b.shape[0]
-            h.write('\n'.join(['\t'.join(map(str, x)) for x in b])+'\n')
+            h.write('\n'.join([' '.join(map(str, x)) for x in b])+'\n')
     h5.close()
 
     with open(o2, 'w') as h:
         h.write('%%MatrixMarket matrix coordinate integer general\n%metadata_json: {"format_version": 2, "software_version": "3.0.2"}\n')
         h.write("%d %d %d\n" % (data.rawNGenes, data.rawNCells, total))
 
-    os.system("cat %s %s > ./nabo_10x/%s/matrix.mtx" % (o2, o1, temp_suffix))
+    os.system("cat %s %s > %s/matrix.mtx" % (o2, o1, outdir))
     os.system("rm %s %s" % (o1,  o2))
 
     with open('%s/genes.tsv' % outdir, 'w') as h:
-        h.write('\n'.join([x+'\t'+x for x in data.genes]))
-    with open('%s/barcodes.tsv' % temp_suffix, 'w') as h:
-        h.write('\n'.join(data.cells))
+        h.write('\n'.join([x+'\t'+x for x in data.genes])+'\n')
+    with open('%s/barcodes.tsv' % outdir, 'w') as h:
+        h.write('\n'.join(data.cells)+'\n')
