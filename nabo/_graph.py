@@ -649,7 +649,7 @@ class Graph(nx.Graph):
                         score[i] += j[2]['weight']
                 else:
                     score[i] += 1
-        score = {k: score_multiplier * v / len(self.targetNodes[target])
+        score = {k: score_multiplier * v / len(include_nodes)
                  for k, v in score.items()}
 
         if by_cluster:
