@@ -6,6 +6,7 @@ from natsort import natsorted
 import pandas as pd
 
 plt.style.use('fivethirtyeight')
+plt.rcParams['svg.fonttype'] = 'none'
 
 __all__ = ['plot_summary_data', 'plot_mean_var', 'plot_scree',
            'plot_cluster_scores', 'plot_target_class_counts',
@@ -338,7 +339,7 @@ def plot_target_class_counts(values: Dict, ref_values: Dict,
 
 
 def plot_box_exp(dataset, gene, groups, group_names,
-                 save_name=None, dpi=200, show_rest: bool = True) -> None:
+                 save_name=None, dpi=300, show_rest: bool = True, display: bool = True) -> None:
     if len(groups) != len(group_names):
         raise ValueError('Number of groups names not same as number of groups')
     exp = dataset.get_norm_exp(gene, as_dict=True)
@@ -365,13 +366,12 @@ def plot_box_exp(dataset, gene, groups, group_names,
     clean_axis(ax)
     ax.set_xticklabels(group_names, fontsize=14)
     plt.tight_layout()
-    # lgd = ax.legend(bp['boxes'], group_names,
-    #                 loc=(1.1, 0.5), frameon=False, fontsize=12)
     if save_name is not None:
-        # fig.savefig(save_name, bbox_extra_artists=(lgd,),
-        #             bbox_inches='tight', dpi=dpi, transparent=True)
         fig.savefig(save_name, bbox_inches='tight', dpi=dpi, transparent=True)
-    plt.show()
+    if display:
+        plt.show()
+    else:
+        plt.close()
     return None
 
 
