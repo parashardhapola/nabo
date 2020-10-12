@@ -239,8 +239,7 @@ class Dataset:
         """
         a = self._get_empty_cell_array()
         h5: h5py.File = h5py.File(self.h5Fn, mode='r', libver='latest')
-        for i in tqdm(range(self.rawNCells), bar_format=tqdm_bar,
-                      leave=False, desc='Calculating genes per cell     '):
+        for i in tqdm(range(self.rawNCells), bar_format=tqdm_bar, desc='Calculating genes per cell     '):
             a[i] = h5['cell_data'][self.cells[i]].shape[0]
         h5.close()
         return a
@@ -253,8 +252,7 @@ class Dataset:
         """
         a = self._get_empty_cell_array()
         h5: h5py.File = h5py.File(self.h5Fn, mode='r', libver='latest')
-        for i in tqdm(range(self.rawNCells), bar_format=tqdm_bar,
-                      leave=False, desc='Calculating total exp per cell '):
+        for i in tqdm(range(self.rawNCells), bar_format=tqdm_bar, desc='Calculating total exp per cell '):
             a[i] = h5['cell_data'][self.cells[i]]['val'].sum()
         h5.close()
         return a
@@ -268,8 +266,7 @@ class Dataset:
         """
         a = self._get_empty_gene_array()
         h5: h5py.File = h5py.File(self.h5Fn, mode='r', libver='latest')
-        for i in tqdm(range(self.rawNGenes), bar_format=tqdm_bar,
-                      leave=False, desc='Calculating gene abundance     '):
+        for i in tqdm(range(self.rawNGenes), bar_format=tqdm_bar, desc='Calculating gene abundance     '):
             a[i] = h5['gene_data'][self.genes[i]].shape[0]
         h5.close()
         return a
@@ -328,7 +325,7 @@ class Dataset:
                      min_ratio: float = 0.5) -> pd.Series:
         """
         Get cell library based on hashtag ratios
-        :param hto_patterns: Pattern to search for hastags
+        :param hto_patterns: Pattern to search for hashtags
         :param min_ratio: Minimum ratio (0.5)
         :return: Pandas series
         """
@@ -574,8 +571,7 @@ class Dataset:
         else:
             self.sf: np.ndarray = np.ones(self.rawNCells, dtype=np.float32)
             h5: h5py.File = h5py.File(self.h5Fn, mode='r', libver='latest')
-            for i in tqdm(range(self.rawNCells), bar_format=tqdm_bar,
-                          leave=False, desc='Setting cell size factors      '):
+            for i in tqdm(range(self.rawNCells), bar_format=tqdm_bar, desc='Setting cell size factors      '):
                 temp = self._get_empty_gene_array()
                 d = h5['cell_data'][self.cells[i]]
                 temp[d['idx']] = d['val']
@@ -606,8 +602,7 @@ class Dataset:
         stats = {}
         keep_genes = {x: 0 for x in self.keepGenesIdx}
         h5: h5py.File = h5py.File(self.h5Fn, mode='r', libver='latest')
-        for i in tqdm(range(self.rawNGenes), bar_format=tqdm_bar, leave=False,
-                      desc='Calculating gene-wise stats    '):
+        for i in tqdm(range(self.rawNGenes), bar_format=tqdm_bar, desc='Calculating gene-wise stats    '):
             gene = self.genes[i]
             if i in keep_genes:
                 d = h5['gene_data'][gene][:]
@@ -907,8 +902,7 @@ class Dataset:
             print("WARNING: %d out %d genes are missing in this dataset" %
                   (len(missing_genes_pos), len(goi)))
         h5: h5py.File = h5py.File(self.h5Fn, mode='r', libver='latest')
-        for i in tqdm(self.keepCellsIdx, bar_format=tqdm_bar, leave=False,
-                      disable=disable_tqdm, desc=tqdm_msg):
+        for i in tqdm(self.keepCellsIdx, bar_format=tqdm_bar, disable=disable_tqdm, desc=tqdm_msg):
             d = h5['cell_data'][self.cells[i]]
             a = self._get_empty_gene_array()
             a[d['idx']] = d['val']

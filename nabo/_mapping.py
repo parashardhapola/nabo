@@ -96,7 +96,7 @@ def _calc_dist(target_fn: str, target_grp: str, ref_fn: str, ref_grp: str,
     sorted_dist_data: h5py.Group = out_h5.create_group(sorted_dist_grp)
 
     for i in tqdm(range(target_n_cells + 1), total=target_n_cells,
-                  bar_format=tqdm_bar, leave=False, desc=tqdm_msg1):
+                  bar_format=tqdm_bar, desc=tqdm_msg1):
         if i < target_n_cells:
             target_c = target_cells[i]
             dist_data.create_dataset(target_c, shape=(ref_n_cells,),
@@ -136,8 +136,7 @@ def _calc_dist(target_fn: str, target_grp: str, ref_fn: str, ref_grp: str,
                                     ref_cells[x] in ignore_ref_cells]
     mask_bool = np.zeros(ref_n_cells, dtype=bool)
     mask_bool[ignored_cells_idx] = True
-    for cell in tqdm(dist_data, bar_format=tqdm_bar, leave=False,
-                     desc=tqdm_msg2):
+    for cell in tqdm(dist_data, bar_format=tqdm_bar, desc=tqdm_msg2):
         a = np.ma.array(dist_data[cell][:], mask=mask_bool)
         if intra_ref:
             data: np.ndarray = np.argsort(a)[1:]
@@ -184,8 +183,7 @@ def _calc_snn(fn: str, target_grp: str, target_suffix: str,
     ref_data: h5py.Group = h5[ref_grp]
     g = nx.Graph()
     factor = 2 * (k - 1)
-    for target_c in tqdm(target_data, bar_format=tqdm_bar,
-                         leave=False, desc=tqdm_msg):
+    for target_c in tqdm(target_data, bar_format=tqdm_bar, desc=tqdm_msg):
         # Adding node here such that isolates are also included
         # Adding a mock attribute to extract target cells later
         g.add_node(target_c + '_' + target_suffix, target=None)
