@@ -297,6 +297,8 @@ class Mapping:
                  ref_pca_grp_name: str, overwrite: bool = False):
 
         self._h5Fn: str = mapping_h5_fn
+        if ref_name.find('__') != -1:
+            raise ValueError('ERROR: Underscores are not allowed in the value for `ref_name` parameter')
         self.refName: str = ref_name
         self._refPcaFn: str = ref_pca_fn
         self._refPcaGrp: str = ref_pca_grp_name
@@ -587,6 +589,8 @@ class Mapping:
         if target_name == self.refName:
             raise ValueError('ERROR: Target name cannot be same as reference '
                              'name. Please provide a different name.')
+        if target_name.find('__') != -1:
+            raise ValueError('ERROR: Underscores are not allowed in the value for `target_name` parameter')
         if ignore_ref_cells is None:
             ignore_ref_cells = []
         if use_stored_distances is True:
